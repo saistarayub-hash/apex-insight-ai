@@ -1399,9 +1399,8 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
  * no global WebSocket. A browser does, so the standalone single-file build can
  * talk to Deriv's public WebSocket directly and get real prices with no backend.
  *
- * This only activates when `/api/live` is unavailable (standalone file, or the
- * Node server is down), so it never competes with the server feed.
- * Free, keyless, public endpoint.
+ * This is the sole live-price feed: the browser talks to Deriv's public
+ * WebSocket directly — no backend, no dead endpoints. Free, keyless, public.
  *
  * IMPORTANT — request shape (verified against the live endpoint):
  *   On the free public app_id (1089), streaming is not available:
