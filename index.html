@@ -506,6 +506,7 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
 .bcl b{font-size:8px;letter-spacing:.14em;color:var(--red)}
 .bcl.on b{color:var(--green)}
 .bcl.home b{color:var(--cyan)}
+.bcl em{font-style:normal;font-size:8px;color:var(--muted);letter-spacing:.06em}
 
 </style>
 <!-- Built by tools/build-android.js — self-contained, no server required -->
@@ -555,6 +556,12 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
         <circle cx="100" cy="100" r="78" fill="url(#bcFace)" stroke="#3d3325" stroke-width="1"/>
         <g id="bcWedges" fill="#171310" stroke="#060504" stroke-width="1"></g>
         <g id="bcNums" fill="url(#bcGold)" font-family="Georgia, 'Times New Roman', serif" font-size="14" font-weight="700" text-anchor="middle"></g>
+        <g font-family="ui-monospace,monospace" font-size="8.5" text-anchor="middle" font-weight="700">
+          <text id="btm-0" x="60" y="64" fill="#22F5C0" opacity=".35">--:--</text>
+          <text id="btm-1" x="140" y="64" fill="#FFD60A" opacity=".35">--:--</text>
+          <text id="btm-2" x="45" y="104" fill="#00E5FF" opacity=".35">--:--</text>
+          <text id="btm-3" x="155" y="104" fill="#BA68FF" opacity=".35">--:--</text>
+        </g>
         <g id="bcGearA" stroke="#b98d3f" fill="none" stroke-width="1.2">
           <circle cx="100" cy="86" r="16"/>
           <path d="M100 67 V70 M100 102 V105 M81 86 H84 M116 86 H119 M87 73 L89 75 M113 99 L111 97 M113 73 L111 75 M87 99 L89 97"/>
@@ -589,6 +596,7 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
         <circle cx="100" cy="100" r="4" fill="#0d0b09" stroke="url(#bcGold)" stroke-width="1.6"/>
         <text x="100" y="52" font-size="7" fill="#7d6a45" text-anchor="middle" letter-spacing="2.5" font-family="ui-monospace,monospace">APEX</text>
         <text x="100" y="158" font-size="5.5" fill="#6b5a3a" text-anchor="middle" letter-spacing="2" font-family="ui-monospace,monospace">SAST · UTC+2</text>
+        <text id="bcOverlap" x="100" y="168" font-size="6" fill="#7d6a45" text-anchor="middle" letter-spacing="1.5" font-family="ui-monospace,monospace">—</text>
       </svg>
       <div class="bc-legend" id="bcLegend"></div>
     </div>
@@ -1754,7 +1762,7 @@ function buildBigClock() {
   const ag = document.getElementById('bcArcs'); if (ag) ag.innerHTML = arcs;
   const lg = $('#bcLegend');
   if (lg) lg.innerHTML = ARC_ZONES.map((z, i) =>
-    `<span class="bcl" data-i="${i}" style="--zc:${z.c}"><i></i>${z.code}<b>—</b></span>`).join('') +
+    `<span class="bcl" data-i="${i}" style="--zc:${z.c}"><i></i>${z.code}<em>${String(z.s[0]).padStart(2, '0')}:00–${String(z.s[1]).padStart(2, '0')}:00</em><b>—</b></span>`).join('') +
     '<span class="bcl home" style="--zc:#E8F6FF"><i></i>JHB<b>HOME</b></span>';
   updateBigClock(new Date());
 }
@@ -1765,13 +1773,24 @@ function updateBigClock(now) {
   rot('bcH', hh * 30 + mm * 0.5);
   rot('bcM', mm * 6 + ss * 0.1);
   rot('bcS', ss * 6);
+  const openCodes = [];
   ARC_ZONES.forEach((z, i) => {
     const h = zoneHour(z.tz, now);
     const on = z.s[0] < z.s[1] ? (h >= z.s[0] && h < z.s[1]) : (h >= z.s[0] || h < z.s[1]);
+    if (on) openCodes.push(z.code);
     document.querySelectorAll(`.bc-arc[data-i="${i}"]`).forEach(p => p.classList.toggle('on', on));
     const le = document.querySelector(`.bcl[data-i="${i}"]`);
     if (le) { le.classList.toggle('on', on); const b = le.querySelector('b'); if (b) b.textContent = on ? 'OPEN' : 'CLOSED'; }
+    const tm = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: z.tz }).format(now);
+    const tt = document.getElementById('btm-' + i);
+    if (tt) { tt.textContent = tm; tt.setAttribute('opacity', on ? '1' : '.35'); }
   });
+  const ov = document.getElementById('bcOverlap');
+  if (ov) {
+    if (openCodes.length >= 2) { ov.textContent = 'OVERLAP · ' + openCodes.join(' + '); ov.setAttribute('fill', '#FFD60A'); }
+    else if (openCodes.length === 1) { ov.textContent = openCodes[0] + ' OPEN · NO OVERLAP'; ov.setAttribute('fill', '#7d6a45'); }
+    else { ov.textContent = 'ALL SESSIONS CLOSED'; ov.setAttribute('fill', '#7d6a45'); }
+  }
 }
 buildBigClock();
 
