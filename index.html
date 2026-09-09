@@ -495,6 +495,18 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
 .sdial:not(.open) svg{opacity:.55}
 @media(max-width:420px){.sessionboard{gap:5px}.sd-lbl b{font-size:9px}.sd-state{font-size:7px}}
 
+/* ── one big skeleton clock ──────────────────────────────── */
+.bigclock{display:flex;flex-direction:column;align-items:center;gap:9px;margin:2px 0 16px}
+.bigclock svg{width:100%;max-width:440px;height:auto;filter:drop-shadow(0 10px 34px rgba(0,0,0,.65))}
+.bc-arc{stroke-width:2.4;opacity:.28;transition:opacity .5s,stroke-width .5s}
+.bc-arc.on{opacity:1;stroke-width:3.1}
+.bc-legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.bcl{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--muted)}
+.bcl i{width:9px;height:9px;border-radius:50%;background:var(--zc);box-shadow:0 0 8px var(--zc)}
+.bcl b{font-size:8px;letter-spacing:.14em;color:var(--red)}
+.bcl.on b{color:var(--green)}
+.bcl.home b{color:var(--cyan)}
+
 </style>
 <!-- Built by tools/build-android.js — self-contained, no server required -->
 </head>
@@ -520,8 +532,66 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
       <span class="hint">Upload a chart → your trade plan, levels and session state in one screen · analysis only, not financial advice</span>
     </div>
 
-    <!-- ── FOREX-HOURS style session board · full-width analogue dials ── -->
-    <div class="sessionboard" id="sessionBoard" aria-label="World session analogue clocks"></div>
+    <!-- ── ONE big skeleton clock · Roman numerals + brass gears + session arcs ── -->
+    <div class="bigclock">
+      <svg id="bigClock" viewBox="0 0 200 200" aria-label="SAST skeleton clock with session arcs">
+        <defs>
+          <linearGradient id="bcRim" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#3a3a3e"/><stop offset=".5" stop-color="#0c0c0e"/><stop offset="1" stop-color="#2a2a2e"/>
+          </linearGradient>
+          <radialGradient id="bcFace" cx="50%" cy="45%" r="60%">
+            <stop offset="0" stop-color="#161310"/><stop offset=".7" stop-color="#0d0b09"/><stop offset="1" stop-color="#070605"/>
+          </radialGradient>
+          <linearGradient id="bcGold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#e8c87e"/><stop offset=".5" stop-color="#a97e2f"/><stop offset="1" stop-color="#d4af5e"/>
+          </linearGradient>
+          <linearGradient id="bcHand" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f5e6c4"/><stop offset="1" stop-color="#8a6a2f"/>
+          </linearGradient>
+        </defs>
+        <circle cx="100" cy="100" r="99" fill="url(#bcRim)"/>
+        <circle cx="100" cy="100" r="93" fill="#0a0908"/>
+        <g id="bcArcs" fill="none" stroke-linecap="round"></g>
+        <circle cx="100" cy="100" r="78" fill="url(#bcFace)" stroke="#3d3325" stroke-width="1"/>
+        <g id="bcWedges" fill="#171310" stroke="#060504" stroke-width="1"></g>
+        <g id="bcNums" fill="url(#bcGold)" font-family="Georgia, 'Times New Roman', serif" font-size="14" font-weight="700" text-anchor="middle"></g>
+        <g id="bcGearA" stroke="#b98d3f" fill="none" stroke-width="1.2">
+          <circle cx="100" cy="86" r="16"/>
+          <path d="M100 67 V70 M100 102 V105 M81 86 H84 M116 86 H119 M87 73 L89 75 M113 99 L111 97 M113 73 L111 75 M87 99 L89 97"/>
+          <path d="M100 74 V98 M88 86 H112 M91.5 77.5 L108.5 94.5 M108.5 77.5 L91.5 94.5" stroke-width=".8" opacity=".8"/>
+          <circle cx="100" cy="86" r="3" fill="#1a1408"/>
+          <animateTransform attributeName="transform" type="rotate" from="0 100 86" to="360 100 86" dur="24s" repeatCount="indefinite"/>
+        </g>
+        <g id="bcGearB" stroke="#8a6a2f" fill="none" stroke-width="1.1">
+          <circle cx="84" cy="112" r="11"/>
+          <path d="M84 98 V101 M84 123 V126 M70 112 H73 M95 112 H98 M74 102 L76 104 M94 122 L92 120 M94 102 L92 104 M74 122 L76 120"/>
+          <path d="M84 104 V120 M76 112 H92" stroke-width=".7" opacity=".8"/>
+          <circle cx="84" cy="112" r="2.2" fill="#1a1408"/>
+          <animateTransform attributeName="transform" type="rotate" from="360 84 112" to="0 84 112" dur="14s" repeatCount="indefinite"/>
+        </g>
+        <g id="bcGearC" stroke="#c9a04f" fill="none" stroke-width="1">
+          <circle cx="117" cy="110" r="8"/>
+          <path d="M117 99 V102 M117 118 V121 M106 110 H109 M125 110 H128 M109.5 102.5 L111.5 104.5 M124.5 117.5 L122.5 115.5 M124.5 102.5 L122.5 104.5 M109.5 117.5 L111.5 115.5"/>
+          <circle cx="117" cy="110" r="1.8" fill="#1a1408"/>
+          <animateTransform attributeName="transform" type="rotate" from="0 117 110" to="360 117 110" dur="9s" repeatCount="indefinite"/>
+        </g>
+        <g id="bcTourb">
+          <circle cx="100" cy="134" r="13" fill="#060505" stroke="#d4af5e" stroke-opacity=".7"/>
+          <g stroke="#e8d9b0" stroke-width="1" fill="none">
+            <circle cx="100" cy="134" r="9"/>
+            <path d="M100 125 V143 M91 134 H109 M93.5 127.5 L106.5 140.5 M106.5 127.5 L93.5 140.5"/>
+            <animateTransform attributeName="transform" type="rotate" from="0 100 134" to="360 100 134" dur="6s" repeatCount="indefinite"/>
+          </g>
+        </g>
+        <g id="bcH"><path d="M100 108 L100 60" stroke="url(#bcHand)" stroke-width="5" stroke-linecap="round"/></g>
+        <g id="bcM"><path d="M100 110 L100 36" stroke="url(#bcHand)" stroke-width="3.2" stroke-linecap="round"/></g>
+        <g id="bcS"><path d="M100 116 L100 30" stroke="#FF4860" stroke-width="1.4" stroke-linecap="round"/><circle cx="100" cy="112" r="2.6" fill="#FF4860"/></g>
+        <circle cx="100" cy="100" r="4" fill="#0d0b09" stroke="url(#bcGold)" stroke-width="1.6"/>
+        <text x="100" y="52" font-size="7" fill="#7d6a45" text-anchor="middle" letter-spacing="2.5" font-family="ui-monospace,monospace">APEX</text>
+        <text x="100" y="158" font-size="5.5" fill="#6b5a3a" text-anchor="middle" letter-spacing="2" font-family="ui-monospace,monospace">SAST · UTC+2</text>
+      </svg>
+      <div class="bc-legend" id="bcLegend"></div>
+    </div>
 
     <!-- ── TRADE PLAN · big readable blocks ── -->
     <div class="plan" id="planBox">
@@ -1642,70 +1712,68 @@ function tickClock() {
   S.killzoneActive = !!kz.active;
   const szt = Cobra.toSAST(now);
   S.hourSast = szt.getHours() + szt.getMinutes() / 60;
-  updateBoard(now);
+  updateBigClock(now);
   renderNewsCountdown();
 }
 setInterval(tickClock, 1000);
 
-/* ── forex-hours style session board · full-width analogue dials */
-const BOARD_ZONES = [
-  { code: 'JHB', tz: 'Africa/Johannesburg', c: '#E8F6FF', home: true },
+/* ── one big skeleton clock · session arcs on the bezel ──── */
+const ARC_ZONES = [
   { code: 'SYD', tz: 'Australia/Sydney', c: '#22F5C0', s: [23, 8] },
   { code: 'TOK', tz: 'Asia/Tokyo', c: '#FFD60A', s: [9, 15] },
   { code: 'LDN', tz: 'Europe/London', c: '#00E5FF', s: [9, 18] },
   { code: 'NY', tz: 'America/New_York', c: '#BA68FF', s: [14, 23] },
 ];
-function zoneParts(tz, now) {
-  const parts = new Intl.DateTimeFormat('en-GB', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false, timeZone: tz }).formatToParts(now);
-  const g = (t) => parseInt(parts.find(p => p.type === t).value, 10);
-  return { h: g('hour') % 12, m: g('minute'), s: g('second') };
+function polar(r, deg) { const a = (deg - 90) * Math.PI / 180; return [100 + r * Math.cos(a), 100 + r * Math.sin(a)]; }
+function arcPath(r, a0, a1) {
+  const [x0, y0] = polar(r, a0), [x1, y1] = polar(r, a1);
+  const large = (a1 - a0) > 180 ? 1 : 0;
+  return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 ${large} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
 }
-function dialSVG(z, i) {
-  let ticks = '';
-  for (let k = 0; k < 12; k++) {
-    const a = k * 30 * Math.PI / 180;
-    ticks += `<line x1="${(50 + 40 * Math.sin(a)).toFixed(1)}" y1="${(50 - 40 * Math.cos(a)).toFixed(1)}" x2="${(50 + 44 * Math.sin(a)).toFixed(1)}" y2="${(50 - 44 * Math.cos(a)).toFixed(1)}"${k % 3 === 0 ? ' stroke-width="2.4"' : ''} />`;
+function buildBigClock() {
+  const RN = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+  let wedges = '', nums = '';
+  for (let h = 0; h < 12; h++) {
+    const a = h * 30 * Math.PI / 180;
+    const s = Math.sin(a), c = Math.cos(a);
+    const w0 = 74, w1 = 92, hw0 = 7, hw1 = 12;
+    const p = (r, o) => `${(100 + r * s + o * c).toFixed(1)},${(100 - r * c + o * s).toFixed(1)}`;
+    wedges += `<polygon points="${p(w0, -hw0)} ${p(w1, -hw1)} ${p(w1, hw1)} ${p(w0, hw0)}"/>`;
+    const [nx, ny] = polar(84, h * 30);
+    nums += `<text x="${nx.toFixed(1)}" y="${(ny + 5).toFixed(1)}">${RN[h]}</text>`;
   }
-  const tourb = z.home ? `
-      <g class="sd-tourb"><circle cx="50" cy="69" r="9"/>
-        <g><circle cx="50" cy="69" r="6"/><path d="M50 63 V75 M44 69 H56 M46 65 L54 73 M54 65 L46 73"/>
-        <animateTransform attributeName="transform" type="rotate" from="0 50 69" to="360 50 69" dur="6s" repeatCount="indefinite"/></g>
-      </g>` : '';
-  return `<div class="sdial" id="sd-${z.code}" style="--zc:${z.c}">
-    <svg viewBox="0 0 100 100">
-      <circle cx="50" cy="50" r="47" class="sd-face"/>
-      <g class="sd-ticks">${ticks}</g>
-      <g id="bh-${i}"><path d="M50 55 L50 30" class="sd-hh"/></g>
-      <g id="bm-${i}"><path d="M50 57 L50 21" class="sd-mh"/></g>
-      ${z.home ? `<g id="bs-${i}"><path d="M50 59 L50 16" class="sd-sh"/></g>` : ''}
-      ${tourb}
-      <circle cx="50" cy="50" r="2.6" class="sd-cap"/>
-    </svg>
-    <div class="sd-lbl"><b>${z.code}</b><i class="sd-state">—</i></div>
-  </div>`;
+  const wg = document.getElementById('bcWedges'); if (wg) wg.innerHTML = wedges;
+  const ng = document.getElementById('bcNums'); if (ng) ng.innerHTML = nums;
+  let arcs = '';
+  ARC_ZONES.forEach((z, i) => {
+    const r = 83 + i * 3.4;
+    const a0 = z.s[0] * 15, a1 = z.s[1] * 15;
+    if (a1 > a0) arcs += `<path class="bc-arc" data-i="${i}" d="${arcPath(r, a0, a1)}" stroke="${z.c}"/>`;
+    else arcs += `<path class="bc-arc" data-i="${i}" d="${arcPath(r, a0, 359.9)}" stroke="${z.c}"/><path class="bc-arc" data-i="${i}" d="${arcPath(r, 0, a1)}" stroke="${z.c}"/>`;
+  });
+  const ag = document.getElementById('bcArcs'); if (ag) ag.innerHTML = arcs;
+  const lg = $('#bcLegend');
+  if (lg) lg.innerHTML = ARC_ZONES.map((z, i) =>
+    `<span class="bcl" data-i="${i}" style="--zc:${z.c}"><i></i>${z.code}<b>—</b></span>`).join('') +
+    '<span class="bcl home" style="--zc:#E8F6FF"><i></i>JHB<b>HOME</b></span>';
+  updateBigClock(new Date());
 }
-function updateBoard(now) {
-  const rot = (id, deg) => { const n = document.getElementById(id); if (n) n.setAttribute('transform', `rotate(${deg.toFixed(1)} 50 50)`); };
-  BOARD_ZONES.forEach((z, i) => {
-    const p = zoneParts(z.tz, now);
-    rot(`bh-${i}`, p.h * 30 + p.m * 0.5);
-    rot(`bm-${i}`, p.m * 6 + p.s * 0.1);
-    if (z.home) rot(`bs-${i}`, p.s * 6);
-    const wrap = document.getElementById('sd-' + z.code);
-    if (!wrap) return;
-    let on = true;
-    if (z.s) { const h = zoneHour(z.tz, now); on = z.s[0] < z.s[1] ? (h >= z.s[0] && h < z.s[1]) : (h >= z.s[0] || h < z.s[1]); }
-    wrap.classList.toggle('open', on);
-    const st = wrap.querySelector('.sd-state');
-    if (st) st.textContent = z.home ? 'HOME · SAST' : (on ? 'OPEN' : 'CLOSED');
+function updateBigClock(now) {
+  const szt = Cobra.toSAST(now);
+  const hh = szt.getHours() % 12, mm = szt.getMinutes(), ss = szt.getSeconds();
+  const rot = (id, deg) => { const n = document.getElementById(id); if (n) n.setAttribute('transform', `rotate(${deg.toFixed(1)} 100 100)`); };
+  rot('bcH', hh * 30 + mm * 0.5);
+  rot('bcM', mm * 6 + ss * 0.1);
+  rot('bcS', ss * 6);
+  ARC_ZONES.forEach((z, i) => {
+    const h = zoneHour(z.tz, now);
+    const on = z.s[0] < z.s[1] ? (h >= z.s[0] && h < z.s[1]) : (h >= z.s[0] || h < z.s[1]);
+    document.querySelectorAll(`.bc-arc[data-i="${i}"]`).forEach(p => p.classList.toggle('on', on));
+    const le = document.querySelector(`.bcl[data-i="${i}"]`);
+    if (le) { le.classList.toggle('on', on); const b = le.querySelector('b'); if (b) b.textContent = on ? 'OPEN' : 'CLOSED'; }
   });
 }
-function buildBoard() {
-  const b = $('#sessionBoard');
-  if (b) b.innerHTML = BOARD_ZONES.map((z, i) => dialSVG(z, i)).join('');
-  updateBoard(new Date());
-}
-buildBoard();
+buildBigClock();
 
 /* ══════════════════════════════════════════════════════════ symbols */
 function fillSymbols() {
