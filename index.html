@@ -657,7 +657,7 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
           <canvas id="viewCanvas"></canvas>
           <div class="canvas-empty" id="canvasEmpty">
             <p>Your annotated chart appears here</p>
-            <span>COBRA draws only high-confidence institutional levels — no random lines</span>
+            <span>The vision engine draws only the levels it actually reads off your screenshot — retested institutional zones, never random lines</span>
           </div>
         </div>
       </div>
@@ -697,7 +697,6 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
       <button type="button" class="cchip" data-card="cardSetup">SETUP</button>
       <button type="button" class="cchip" data-card="cardStructure">STRUCTURE</button>
       <button type="button" class="cchip" data-card="cardLiquidity">LIQUIDITY</button>
-      <button type="button" class="cchip" data-card="cardNews">NEWS</button>
     </div>
     <div class="cards">
       <article class="card glow-cyan" id="cardSession">
@@ -746,17 +745,6 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
         <div id="setupBody"><p class="muted">No analysis yet — upload a chart above.</p></div>
       </article>
 
-      <article class="card" id="cardNews">
-        <div class="card-top"><span class="card-ico">⚑</span><h3>NEWS IMPACT</h3></div>
-        <div class="news-counts">
-          <div class="nc hi"><b id="newsHi">0</b><span>HIGH</span></div>
-          <div class="nc med"><b id="newsMed">0</b><span>MED</span></div>
-          <div class="nc lo"><b id="newsLo">0</b><span>LOW</span></div>
-        </div>
-        <div class="kv"><span>Next USD event</span><b id="newsNext">—</b></div>
-        <div class="news-warn hidden" id="newsWarn">⚠ High-impact news in <b id="newsWarnMin">—</b> min — pause trading</div>
-        <div class="news-list" id="newsList"><p class="muted">loading calendar…</p></div>
-      </article>
     </div>
 
     <div class="panel">
@@ -1721,7 +1709,6 @@ function tickClock() {
   const szt = Cobra.toSAST(now);
   S.hourSast = szt.getHours() + szt.getMinutes() / 60;
   updateBigClock(now);
-  renderNewsCountdown();
 }
 setInterval(tickClock, 1000);
 
@@ -1897,7 +1884,11 @@ async function runVision() {
     c.getContext('2d').drawImage(S.img, 0, 0, c.width, c.height);
     const imageDataUrl = c.toDataURL('image/jpeg', 0.85);
     const allowScalping = $('#allowScalping') ? $('#allowScalping').checked : true;
-    const payload = JSON.stringify(Object.assign({ imageDataUrl, allowScalping }, S.byok.key ? { userKey: S.byok.key } : {}));
+    const livePrice = symbolLivePrice();
+    const payload = JSON.stringify(Object.assign({
+      imageDataUrl, allowScalping,
+      symbol: S.settings.symbol, livePrice,
+    }, S.byok.key ? { userKey: S.byok.key } : {}));
     const eps = [visionEndpoint()];
     if (typeof location !== 'undefined' && (location.protocol === 'http:' || location.protocol === 'https:') && eps[0] !== '/api/analyze-chart') eps.push('/api/analyze-chart');
     let r = null, j = {};
@@ -2074,26 +2065,15 @@ function renderLive() {
   lb.innerHTML = S.live.rows.map(r => `
     <div class="lv"><span>${esc(r.name)}</span><b class="${r.chg >= 0 ? 'up' : 'dn'}">${fmt(r.price, r.digits)} (${r.chg >= 0 ? '+' : ''}${r.chg}%)</b></div>`).join('');
 }
-async function pollLive() {
-  try {
-    const r = await fetch('/api/live', { cache: 'no-store' });
-    if (!r.ok) throw new Error();
-    S.live = await r.json();
+function startLive() {
+  if (S.liveWsStarted || typeof CobraLiveWS === 'undefined') return;
+  S.liveWsStarted = CobraLiveWS.start((rows) => {
+    if (!rows.length) return;
+    S.live = { rows, time: new Date().toLocaleTimeString(), direct: true };
     renderLive();
-    S.liveFailed = 0;
-  } catch (e) {
-    S.liveFailed = (S.liveFailed || 0) + 1;
-    if (S.liveFailed >= 2 && !S.liveWsStarted && typeof CobraLiveWS !== 'undefined') {
-      S.liveWsStarted = CobraLiveWS.start((rows) => {
-        if (!rows.length) return;
-        S.live = { rows, time: new Date().toLocaleTimeString(), direct: true };
-        renderLive();
-      });
-      const ls = $('#liveState'); if (S.liveWsStarted && ls) ls.textContent = 'live · direct Deriv feed';
-    }
-  }
+  });
+  const ls = $('#liveState'); if (S.liveWsStarted && ls) ls.textContent = 'live · direct Deriv feed';
 }
-setInterval(pollLive, 15000);
 setInterval(() => { const p = symbolLivePrice(); if (p != null) S.livePrice = p; }, 5000);
 
 const digits = () => guessDigits((S.settings && S.settings.symbol) || 'XAUUSD');
@@ -2114,6 +2094,8 @@ function renderVisionPanel() {
   const dg = digits();
   const rows = [];
   rows.push(`<div class="ap-big ${a.trend === 'UP' ? 'BUY' : a.trend === 'DOWN' ? 'SELL' : 'WAIT'}">${a.trend === 'RANGE' ? 'RANGE — WAIT' : a.trend + ' TREND'}</div>`);
+  const meta = a.meta || {};
+  rows.push(`<div class="ap-row"><span>ENGINE</span><b>${esc(meta.provider || 'vision')}${meta.model ? ' · ' + esc(meta.model) : ''}${meta.anchored ? ' · anchored to live price' : ''}</b></div>`);
   rows.push(`<div class="ap-row"><span>LEVELS</span><b>${a.levels.length} · scenarios ${a.scenarios.length}</b></div>`);
   for (const l of a.levels) {
     rows.push(`<div class="ap-row ${l.type === 'S' ? 'buy' : 'sell'}"><span>${l.type === 'S' ? 'SUPPORT' : 'RESISTANCE'}${l.awaitingConfirmation ? ' · awaiting' : ''}</span><b>${fmt(l.price, dg)} · str ${l.strength} · ${l.touches} touches</b></div>`);
@@ -2131,7 +2113,7 @@ function renderVisionPanel() {
   if (!a.scenarios.length && a.trend !== 'RANGE') rows.push(`<div class="ap-row"><span>CONFIRMATION</span><b style="font-family:var(--sans);font-size:11.5px">No engulfing / rejection confirmed yet — levels marked awaiting confirmation.</b></div>`);
   rows.push(`<div class="ap-row"><span>LIVE PRICE</span><b>${S.livePrice != null ? fmt(S.livePrice, dg) : '— (feed connecting)'}</b></div>`);
   rows.push(`<div class="ap-row"><span>TRIAL</span><b>${Math.max(0, VISION_LIMIT - S.uploads.used)} free analyses left on this device</b></div>`);
-  rows.push(`<div class="ap-row"><span>NOTE</span><b style="font-family:var(--sans);font-size:11px">${esc(a.disclaimer)}</b></div>`);
+  rows.push(`<div class="ap-row"><span>NOTE</span><b style="font-family:var(--sans);font-size:11px">Analysis only — not financial advice. The terminal never executes trades.</b></div>`);
   $('#analysisPanel').innerHTML = `<div class="ap-grid">${rows.join('')}</div>`;
   $('#anTime').textContent = new Date().toLocaleTimeString();
 }
@@ -2169,7 +2151,6 @@ function renderDashboard() {
     { ok: a.trend !== 'RANGE', step: 'TREND FILTER', detail: a.trend === 'RANGE' ? 'ranging — stand aside' : `${a.trend} trend — ${a.trend === 'UP' ? 'buys' : 'sells'} only` },
     { ok: !!s0, step: 'CONFIRMATION', detail: s0 ? 'engulfing / rejection seen' : 'awaiting confirmation at level' },
     { ok: !!S.killzoneActive, step: 'KILLZONE', detail: S.killzoneActive ? 'inside a SAST killzone' : 'outside killzone hours' },
-    { ok: (S.nextNewsMinutes == null || S.nextNewsMinutes > 30), step: 'NEWS CLEAR', detail: (S.nextNewsMinutes == null || S.nextNewsMinutes > 30) ? 'no red folder in 30m' : `high-impact news in ${Math.round(S.nextNewsMinutes)}m` },
     { ok: tradesToday().length < 3, step: 'MAX 3 TRADES', detail: `${tradesToday().length}/3 taken today` },
   ];
   $('#rulesBox').innerHTML = rules.map(c => `<div class="rule ${c.ok ? 'ok' : 'bad'}"><i>${c.ok ? '✓' : '✕'}</i><div><b>${esc(c.step)}</b><small>${esc(c.detail)}</small></div></div>`).join('');
@@ -2225,69 +2206,6 @@ function renderPlan() {
     ? '<b>CONFIRM BEFORE BUY ·</b> ① pullback tags the ENTRY zone ② bullish engulfing or CHoCH ↑ on 5m at the level ③ killzone active ④ no red news in 30m. Wrong if a candle closes below SL.'
     : '<b>CONFIRM BEFORE SELL ·</b> ① pullback tags the ENTRY zone ② bearish engulfing or CHoCH ↓ on 5m at the level ③ killzone active ④ no red news in 30m. Wrong if a candle closes above SL.';
 }
-
-/* ══════════════════════════════════════════════════════════ news */
-async function loadNews() {
-  try {
-    const r = await fetch('/api/news', { cache: 'no-store' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const j = await r.json();
-    S.news = j.events || [];
-  } catch (e) {
-    $('#newsList').innerHTML = '<p class="muted">News calendar unavailable.</p>';
-    return;
-  }
-  renderNews();
-}
-function relevantNews() {
-  const now = Date.now();
-  const currencies = ['USD', 'GBP', 'EUR', 'ZAR', 'JPY'];
-  return S.news
-    .filter(e => currencies.includes(e.country))
-    .map(e => Object.assign({}, e, { ts: new Date(e.date).getTime() }))
-    .filter(e => e.ts > now - 3600e3)
-    .sort((a, b) => a.ts - b.ts);
-}
-function renderNews() {
-  const list = relevantNews();
-  const next24 = list.filter(e => e.ts < Date.now() + 24 * 3600e3);
-  $('#newsHi').textContent = next24.filter(e => e.impact === 'High').length;
-  $('#newsMed').textContent = next24.filter(e => e.impact === 'Medium').length;
-  $('#newsLo').textContent = next24.filter(e => e.impact === 'Low').length;
-  const usd = next24.find(e => e.country === 'USD');
-  $('#newsNext').textContent = usd ? `${usd.title} · ${Cobra.hhmm(Math.max(0, (usd.ts - Date.now()) / 60000))}` : 'none in 24h';
-  $('#newsList').innerHTML = next24.slice(0, 12).map(e => {
-    const col = e.impact === 'High' ? '#FF4860' : e.impact === 'Medium' ? '#FFD60A' : '#00E5FF';
-    return `<div class="news-item"><span class="dot" style="background:${col}"></span>
-      <span class="t">${esc(e.title)}</span><span class="c">${esc(e.country)} ${Cobra.hhmm(Math.max(0, (e.ts - Date.now()) / 60000))}</span></div>`;
-  }).join('') || '<p class="muted">Nothing scheduled.</p>';
-  renderNewsCountdown();
-}
-function newsAffectsSymbol(sym) {
-  const s = String(sym || '').toUpperCase();
-  if (/XAU|GOLD|XAG|NAS|US30|US500|US100|BTC|ETH/.test(s)) return ['USD'];
-  if (/GBP/.test(s)) return ['GBP', 'USD'];
-  if (/EUR/.test(s)) return ['EUR', 'USD'];
-  if (/ZAR/.test(s)) return ['USD', 'ZAR'];
-  if (/JPY/.test(s)) return ['JPY', 'USD'];
-  return null;
-}
-function renderNewsCountdown() {
-  const sym = S.settings.symbol;
-  const affected = newsAffectsSymbol(sym);
-  const pool = relevantNews().filter(e => !affected || affected.includes(e.country));
-  const nextHigh = pool.find(e => e.impact === 'High' && e.ts > Date.now());
-  const mins = nextHigh ? (nextHigh.ts - Date.now()) / 60000 : null;
-  S.nextNewsMinutes = mins;
-  const w = $('#newsWarn');
-  if (w) {
-    if (mins != null && mins < 30) {
-      w.classList.remove('hidden');
-      $('#newsWarnMin').textContent = Math.round(mins);
-    } else w.classList.add('hidden');
-  }
-}
-setInterval(() => { if (S.news.length) renderNews(); }, 60000);
 
 /* ══════════════════════════════════════════════════════════ journal */
 function tradesToday() {
@@ -2548,7 +2466,7 @@ function boot() {
   $('#goalForm').goal.value = S.settings.dailyGoal; $('#goalForm').limit.value = S.settings.dailyLossLimit;
   tickClock();
   renderDashboard(); renderCalc(); renderGoal(); renderJournal();
-  loadNews(); pollLive();
+  startLive();
   if (S.last) toast(`Last session: ${S.last.symbol} → ${S.last.bias}`);
 }
 boot();
