@@ -536,10 +536,6 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
 
   <!-- ══════════════ SCREEN 1 · DASHBOARD + ANALYZER (merged) ══════════════ -->
   <section class="screen active" id="screen-dashboard">
-    <div class="screen-head">
-      <h2>APEX AI ANALYZER</h2>
-      <span class="hint">Upload a chart → your trade plan, levels and session state in one screen · analysis only, not financial advice</span>
-    </div>
 
     <!-- ── ONE big skeleton clock · Roman numerals + brass gears + session arcs ── -->
     <div class="bigclock">
@@ -1916,10 +1912,19 @@ function setHint(t) { const h = $('#calHint'); if (!h) return; if (!t) { h.class
  *  file:// standalone → the deployed function (CORS *). */
 /** Your persistent free backend (Supabase edge fn + Groq). Overridable in Settings. */
 const DEFAULT_VISION = 'https://iynjyxwkgpqladdlmyvo.supabase.co/functions/v1/analyze-chart';
-function visionEndpoint() {
-  if (S.settings.visionUrl) return S.settings.visionUrl;   // user-supplied backend
-  return DEFAULT_VISION;
+function visionEndpoints() {
+  const list = [];
+  const push = (u) => { if (u && !list.includes(u)) list.push(u); };
+  // a same-origin URL can never be a vision backend on static hosting — ignore it
+  if (S.settings.visionUrl && !(typeof location !== 'undefined' && S.settings.visionUrl.startsWith(location.origin))) push(S.settings.visionUrl);
+  push(DEFAULT_VISION);
+  if (typeof location !== 'undefined') {
+    const h = location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || /netlify\.app$/.test(h)) push('/api/analyze-chart');
+  }
+  return list;
 }
+function visionEndpoint() { return visionEndpoints()[0]; }
 
 async function runVision() {
   if (!S.img) { toast('Upload a chart first'); return; }
@@ -1944,12 +1949,7 @@ async function runVision() {
       imageDataUrl, allowScalping,
       symbol: S.settings.symbol, livePrice,
     }, S.byok.key ? { userKey: S.byok.key } : {}));
-    const eps = [visionEndpoint()];
-    if (typeof location !== 'undefined') {
-      const h = location.hostname;
-      // the relative Node-server endpoint only exists on localhost / Netlify — never on static hosts like GitHub Pages
-      if ((h === 'localhost' || h === '127.0.0.1' || /netlify\.app$/.test(h)) && eps[0] !== '/api/analyze-chart') eps.push('/api/analyze-chart');
-    }
+    const eps = visionEndpoints();
     let r = null, j = {}, firstErr = null;
     for (const ep of eps) {
       try {
