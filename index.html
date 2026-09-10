@@ -1612,7 +1612,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
 'use strict';
 
 /* ── auto-update: every device always ends up on the latest published build ── */
-const APP_VERSION = '11';
+const APP_VERSION = '12';
 function checkForUpdate() {
   if (typeof location === 'undefined' || location.protocol === 'file:' || typeof fetch !== 'function') return;
   fetch('https://raw.githubusercontent.com/saistarayub-hash/apex-insight-ai/main/index.html?cb=' + Date.now(), { cache: 'no-store' })
@@ -1973,7 +1973,7 @@ async function runVision() {
     for (const ep of eps) {
       try {
         const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-        const to = ac ? setTimeout(() => ac.abort(), 35000) : null;   // free vision pools can queue 20s+
+        const to = ac ? setTimeout(() => ac.abort(), 60000) : null;   // free vision pools can queue 20s+
         // LOAD-BEARING: text/plain = CORS *simple* request → no preflight. The fn's OPTIONS
         // answer can 500 and kill an application/json call before the body is ever sent. NEVER revert.
         r = await fetch(ep, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: payload, signal: ac ? ac.signal : undefined });
