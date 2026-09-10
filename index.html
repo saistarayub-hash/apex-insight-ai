@@ -1945,16 +1945,21 @@ async function runVision() {
       symbol: S.settings.symbol, livePrice,
     }, S.byok.key ? { userKey: S.byok.key } : {}));
     const eps = [visionEndpoint()];
-    if (typeof location !== 'undefined' && (location.protocol === 'http:' || location.protocol === 'https:') && eps[0] !== '/api/analyze-chart') eps.push('/api/analyze-chart');
-    let r = null, j = {};
+    if (typeof location !== 'undefined') {
+      const h = location.hostname;
+      // the relative Node-server endpoint only exists on localhost / Netlify — never on static hosts like GitHub Pages
+      if ((h === 'localhost' || h === '127.0.0.1' || /netlify\.app$/.test(h)) && eps[0] !== '/api/analyze-chart') eps.push('/api/analyze-chart');
+    }
+    let r = null, j = {}, firstErr = null;
     for (const ep of eps) {
       try {
         r = await fetch(ep, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload });
         j = await r.json().catch(() => ({}));
         if (r.ok) break;
-      } catch (e) { r = null; }
+        if (!firstErr) firstErr = (j && j.error) || ('HTTP ' + r.status);
+      } catch (e) { r = null; if (!firstErr) firstErr = 'backend unreachable'; }
     }
-    if (!r || !r.ok) throw new Error((j && j.error) || ('HTTP ' + (r ? r.status : 'unreachable')));
+    if (!r || !r.ok) throw new Error(firstErr || ('HTTP ' + (r ? r.status : 'unreachable')));
     S.vision = j.analysis;
     S.uploads.used += 1; save(LS.uploads, S.uploads);
     redraw();
