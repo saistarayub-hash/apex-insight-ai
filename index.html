@@ -1612,7 +1612,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
 'use strict';
 
 /* ── auto-update: every device always ends up on the latest published build ── */
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 function checkForUpdate() {
   if (typeof location === 'undefined' || location.protocol === 'file:' || typeof fetch !== 'function') return;
   fetch('https://raw.githubusercontent.com/saistarayub-hash/apex-insight-ai/main/index.html?cb=' + Date.now(), { cache: 'no-store' })
@@ -1972,13 +1972,22 @@ async function runVision() {
     let r = null, j = {}, firstErr = null;
     for (const ep of eps) {
       try {
-        r = await fetch(ep, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload });
+        const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const to = ac ? setTimeout(() => ac.abort(), 35000) : null;   // free vision pools can queue 20s+
+        // LOAD-BEARING: text/plain = CORS *simple* request → no preflight. The fn's OPTIONS
+        // answer can 500 and kill an application/json call before the body is ever sent. NEVER revert.
+        r = await fetch(ep, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: payload, signal: ac ? ac.signal : undefined });
+        if (to) clearTimeout(to);
         j = await r.json().catch(() => ({}));
         if (r.ok) break;
         if (!firstErr) firstErr = (j && j.error) || ('HTTP ' + r.status);
       } catch (e) { r = null; if (!firstErr) firstErr = 'backend unreachable'; }
     }
-    if (!r || !r.ok) throw new Error(firstErr || ('HTTP ' + (r ? r.status : 'unreachable')));
+    if (!r || !r.ok) {
+      setHint('AI is busy — tap ANALYZE again in a minute. Your chart stays loaded.');
+      toast('AI busy — try again in a minute');
+      return;
+    }
     S.vision = j.analysis;
     S.uploads.used += 1; save(LS.uploads, S.uploads);
     redraw();
