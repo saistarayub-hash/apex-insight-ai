@@ -1611,6 +1611,25 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
  */
 'use strict';
 
+/* ── auto-update: every device always ends up on the latest published build ── */
+const APP_VERSION = '10';
+function checkForUpdate() {
+  if (typeof location === 'undefined' || location.protocol === 'file:' || typeof fetch !== 'function') return;
+  fetch('https://raw.githubusercontent.com/saistarayub-hash/apex-insight-ai/main/index.html?cb=' + Date.now(), { cache: 'no-store' })
+    .then(r => (r.ok ? r.text() : ''))
+    .then(t => {
+      const m = t.match(/const APP_VERSION = '([^']+)'/);
+      if (m && m[1] !== APP_VERSION) {
+        try { toast('New version found — updating…'); } catch (e) {}
+        setTimeout(() => {
+          const base = location.href.split('?')[0].split('#')[0];
+          location.replace(base + '?v=' + m[1]);   // new query = fresh fetch, beats any cache
+        }, 900);
+      }
+    })
+    .catch(() => {});
+}
+
 /* ══════════════════════════════════════════════════════════ state */
 const LS = {
   settings: 'cobra.settings.v1',
@@ -2528,6 +2547,7 @@ function boot() {
   renderDashboard(); renderCalc(); renderGoal(); renderJournal();
   startLive();
   if (S.last) toast(`Last session: ${S.last.symbol} → ${S.last.bias}`);
+  checkForUpdate();
 }
 boot();
 
