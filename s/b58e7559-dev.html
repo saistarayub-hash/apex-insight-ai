@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow,noarchive">
+<title>·</title><style>
+ body{background:#070b10;color:#cfe6f2;font:13px/1.5 ui-monospace,Menlo,monospace;margin:0;padding:16px}
+ h1{font-size:14px;letter-spacing:.2em;color:#00e5ff;margin:0 0 12px}
+ .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px}
+ .k{background:#0b1219;border:1px solid #16283a;border-radius:8px;padding:10px}
+ .k b{display:block;font-size:20px;color:#fff}.k span{opacity:.6}
+ table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
+ th,td{text-align:left;padding:4px 8px;border-bottom:1px solid #122031}
+ th{color:#00e5ff;font-weight:400}
+ button{background:#00e5ff14;border:1px solid #00e5ff55;color:#00e5ff;border-radius:6px;padding:3px 10px;cursor:pointer}
+ .bad{color:#ff5b6c}.ok{color:#3ddc84}section{margin-bottom:18px}
+ input,select{background:#0b1219;color:#cfe6f2;border:1px solid #16283a;border-radius:6px;padding:4px}
+</style></head><body>
+<h1>COBRA DEV · <span id="hz">—</span></h1>
+<div id="app">secret: <input id="sec" type="password" size="18"> <button onclick="go(1)">connect</button> <span id="err" class="bad"></span></div>
+<script>
+const FN = 'https://iynjyxwkgpqladdlmyvo.supabase.co/functions/v1' // same backend as the site
+let T = 0
+function go(manual){
+  const sec = localStorage.cobra_admin || (document.getElementById('sec').value.trim() || '')
+  if (!sec) { err('need the ADMIN secret'); return }
+  localStorage.cobra_admin = sec
+  fetch(FN + '/admin-stats?h=' + (document.getElementById('hr') ? document.getElementById('hr').value : 24) + '&key=' + encodeURIComponent(sec))  // GET+query = CORS-simple: no preflight our fns can't answer
+  .then(r => { if (!r.ok) throw new Error(r.status == 403 ? 'wrong secret' : 'HTTP ' + r.status); return r.json() })
+  .then(render).catch(e => { err(e.message); if (manual) setTimeout(() => location.reload(), 1200) })
+}
+function err(m){ document.getElementById('err').textContent = m || '' }
+function render(d){
+  err(''); document.getElementById('hz').textContent = 'last ' + d.hours + 'h · ' + new Date().toLocaleTimeString()
+  const t = d.totals || {}, b = d.bot || {}
+  let h = `<div class="g">
+   <div class="k"><b>${(t.free || 0)}</b><span>anon trials</span></div>
+   <div class="k"><b>${(t.member || 0)}</b><span>members · free-unlimited</span></div>
+   <div class="k"><b>${(t.weekly || 0) + (t.monthly || 0) + (t.lifetime || 0)}</b><span>paid</span></div>
+   <div class="k"><b>R${d.revenue || 0}</b><span>revenue ${d.hours}h</span></div>
+   <div class="k"><b>${b.boosts || 0}</b><span>AI runs ${d.hours}h</span></div>
+   <div class="k"><b class="${(b.success_pct ?? 100) > 85 ? 'ok' : 'bad'}">${b.success_pct}%</b><span>bot success</span></div>
+   <div class="k"><b>${b.p50_ms}ms</b><span>p50 · p95 ${b.p95_ms}ms</span></div>
+   <div class="k"><b>${d.paid.length}</b><span>active subs</span></div></div>`
+  h += `<section>hour filter <select id="hr" onchange="go()"><option>1</option><option selected>24</option><option>168</option></select> · refresh 30s</section>`
+  h += tbl('pending EFT — approve = grant', d.pending_eft, r => `<td>${new Date(r.created_at).toLocaleString()}</td><td>${r.note || ''}</td><td>${r.amount}</td>
+      <td><select id="it${r.id}"><option>weekly</option><option>monthly</option><option>lifetime</option></select>
+      <input id="em${r.id}" placeholder="paid email" size="16"><button onclick="grant(${r.id})">approve</button> <button onclick="deny(${r.id})">✕</button></td>`)
+  h += tbl('paid members', d.paid, r => `<td>@${r.handle}</td><td>${r.plan}</td><td>${new Date(r.paid_until).toLocaleDateString()}</td><td>${r.boosts_hr}/hr ${r.boosts_day}/day</td>
+      <td><button onclick="extend('${r.id}',7)">+7d</button> <button onclick="extend('${r.id}',31)">+31d</button></td>`)
+  h += tbl('signups (recent)', d.recent_signups, r => `<td>${new Date(r.created_at).toLocaleString()}</td><td>@${r.handle}</td><td>${r.plan}</td>`)
+  h += tbl('VIP invites minted', d.invites, r => `<td>${new Date(r.tg_invite_at).toLocaleString()}</td><td>@${r.handle}</td>`)
+  h += `<section><h3 style="color:#ff5b6c;font-size:12px">bot errors (recent)</h3><table><tr><th>when</th><th>kind</th><th>who</th><th>detail</th></tr>`
+   + (d.errors.map(e => `<tr><td>${new Date(e.at).toLocaleTimeString()}</td><td>${e.kind}</td><td>${(e.uid || '').slice(0, 8)}</td><td class="bad">${(e.detail || '').slice(0, 90)}</td></tr>`).join('') || '<tr><td colspan=4 class="ok">clean</td></tr>') + '</table></section>'
+  document.getElementById('app').innerHTML = h
+}
+function tbl(title, rows, f){ return `<section><h3 style="font-size:12px;color:#00e5ff">${title} · ${rows.length}</h3><table>` + (rows.map(r => '<tr>' + f(r) + '</tr>').join('') || '<tr><td>—</td></tr>') + '</table></section>' }
+function grant(id){ const sec = localStorage.cobra_admin; fetch(FN + '/admin-grant', { method: 'POST', headers: { 'content-type': 'text/plain;charset=UTF-8' },   // simple request; key lives in the body
+  body: JSON.stringify({ key: sec, email: document.getElementById('em' + id).value.trim(), item: document.getElementById('it' + id).value, note: 'approve#' + id }) }).then(r => r.json()).then(j => { alert(JSON.stringify(j)); go() }) }
+function deny(id){ fetch(FN + '/admin-grant', { method: 'POST', headers: { 'content-type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({ key: localStorage.cobra_admin, deny: id }) }).then(go) }
+// eslint-disable-next-line
+T = setInterval(go, 30000)
+</script></body></html>
