@@ -1612,7 +1612,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
 'use strict';
 
 /* ── auto-update: every device always ends up on the latest published build ── */
-const APP_VERSION = '12';
+const APP_VERSION = '13';
 function checkForUpdate() {
   if (typeof location === 'undefined' || location.protocol === 'file:' || typeof fetch !== 'function') return;
   fetch('https://raw.githubusercontent.com/saistarayub-hash/apex-insight-ai/main/index.html?cb=' + Date.now(), { cache: 'no-store' })
@@ -1925,6 +1925,72 @@ $$('.vt').forEach(b => b.addEventListener('click', () => {
 
 function setHint(t) { const h = $('#calHint'); if (!h) return; if (!t) { h.classList.add('hidden'); return; } h.textContent = t; h.classList.remove('hidden'); }
 
+/* ══════════════════════════════════════════════════════════ BRAIN v1 — scalping-doctrine grading
+   Deterministic, additive-only: never modifies level prices. SAST = UTC+2. */
+function brainSASTMinutes(now) {
+  const d = new Date(now.getTime() + 7200e3);
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
+}
+function brainGrade(scenario, trend, now, allowScalping, levels) {
+  const reasons = [];
+  let grade = 'A';
+  const wait = (why) => { grade = 'WAIT'; reasons.push(why); };
+  const demoteB = (why) => { if (grade !== 'WAIT') grade = 'B'; reasons.push(why); };
+
+  /* R1 — RR floor */
+  const entry = scenario.entry, sl = scenario.stopLoss;
+  const tp1 = (scenario.targets || [])[0], tp2 = (scenario.targets || [])[1];
+  const risk = Math.abs(entry - sl);
+  let rr = null;
+  if (!(risk > 0) || tp1 == null) {
+    wait('no valid stop/target — cannot verify RR');
+  } else {
+    rr = Math.abs(tp1 - entry) / risk;
+    if (rr < 1) wait(`RR ${rr.toFixed(2)}:1 is below the 1:1 floor — skip`);
+    else if (rr < 1.5 && allowScalping) demoteB(`RR ${rr.toFixed(2)}:1 scalp — half size only`);
+  }
+
+  /* R2 — HTF clearance */
+  if (trend !== 'UP' && trend !== 'DOWN') wait('no HTF clearance — trade only a confirmed break or rejection');
+
+  /* R3 — liquidity windows (SAST), scalps only */
+  if (allowScalping) {
+    const m = brainSASTMinutes(now);
+    const hh = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const prime = (m >= 540 && m < 660) || (m >= 900 && m < 1050);
+    const dead = (m >= 690 && m < 870) || (m >= 1365) || (m < 105);
+    if (dead) wait(`dead liquidity now (${hh} SAST) — scalps refused 11:30–14:30 & 22:45–01:45 SAST`);
+    else if (!prime) demoteB(`outside prime scalp windows (${hh} SAST; prime = 09:00–11:00 & 15:00–17:30) — reduce size`);
+  }
+
+  /* R4/R5 — discipline (advisory) */
+  reasons.push('one plan, ≤3 targets; stop fixed before entry — never widened');
+  if (trend === 'RANGE') reasons.push('RANGE chart — plan stays provisional until break/rejection');
+
+  /* R6 — stop-cluster warning (advisory) */
+  const cluster = (levels || []).find(l => (l.touches || 0) >= 2);
+  if (cluster) reasons.push(`${cluster.type === 'S' ? 'support' : 'resistance'} ${cluster.price} has ${cluster.touches} touches — obvious stop-cluster: expect a sweep, enter on a CLOSE back inside, never the wick; SL 1.5–2× recent bar range away`);
+
+  /* R7 — expectancy */
+  if (rr != null && risk > 0) {
+    const be1 = Math.round(100 / (1 + rr));
+    if (tp2 != null) {
+      const rr2 = Math.abs(tp2 - entry) / risk;
+      const be2 = Math.round(100 / (1 + rr2));
+      reasons.push(`breakeven win rate ${be1}% at TP1 (${rr.toFixed(1)}R) · ${be2}% at TP2 (${rr2.toFixed(1)}R)`);
+      if (!allowScalping && rr2 < 2) demoteB(`ladder only ${rr2.toFixed(1)}R at TP2 — needs >${be2}% win rate to pay`);
+    } else {
+      reasons.push(`breakeven win rate ${be1}% at TP1 (${rr.toFixed(1)}R)`);
+    }
+  }
+  return { grade, rr, reasons };
+}
+function gradeVision(a, allowScalping) {
+  if (!a || !Array.isArray(a.scenarios)) return;
+  const now = new Date();
+  for (const s of a.scenarios) s.brain = brainGrade(s, a.trend, now, allowScalping, a.levels);
+}
+
 /* ══════════════════════════════════════════════════════════ vision backend */
 /** Resolve the analyze-chart endpoint per environment:
  *  Netlify → its function; http(s) preview/local → server route (or Netlify redirect);
@@ -1989,6 +2055,7 @@ async function runVision() {
       return;
     }
     S.vision = j.analysis;
+    gradeVision(S.vision, allowScalping);
     S.uploads.used += 1; save(LS.uploads, S.uploads);
     redraw();
     renderVisionPanel();
@@ -2184,6 +2251,7 @@ function renderVisionPanel() {
   rows.push(`<div class="ap-big ${a.trend === 'UP' ? 'BUY' : a.trend === 'DOWN' ? 'SELL' : 'WAIT'}">${a.trend === 'RANGE' ? 'RANGE — WAIT' : a.trend + ' TREND'}</div>`);
   const meta = a.meta || {};
   rows.push(`<div class="ap-row"><span>ENGINE</span><b>${esc(meta.provider || 'vision')}${meta.model ? ' · ' + esc(meta.model) : ''}${meta.anchored ? ' · anchored to live price' : ''}</b></div>`);
+  if (a.grade) rows.push(`<div class="ap-row"><span>MODEL GRADE</span><b style="max-width:62%;font-family:var(--sans);font-size:11.5px">${esc(a.grade)}${Array.isArray(a.gradeReasons) && a.gradeReasons.length ? ' · ' + esc(a.gradeReasons.join(' · ')) : ''}</b></div>`);
   rows.push(`<div class="ap-row"><span>LEVELS</span><b>${a.levels.length} · scenarios ${a.scenarios.length}</b></div>`);
   for (const l of a.levels) {
     rows.push(`<div class="ap-row ${l.type === 'S' ? 'buy' : 'sell'}"><span>${l.type === 'S' ? 'SUPPORT' : 'RESISTANCE'}${l.awaitingConfirmation ? ' · awaiting' : ''}</span><b>${fmt(l.price, dg)} · str ${l.strength} · ${l.touches} touches</b></div>`);
@@ -2196,6 +2264,7 @@ function renderVisionPanel() {
     rows.push(`<div class="ap-row buy"><span>TARGETS</span><b>${s.targets.map((t, i) => `TP${i + 1} ${fmt(t, dg)}`).join(' · ')}</b></div>`);
     rows.push(`<div class="ap-row"><span>AUTO SIZE</span><b>${ps.belowMin ? '&lt;0.01' : ps.lots} lots · risk R${fmt(R, 0)} · +R${fmt(R, 0)}/+R${fmt(R * 2, 0)}/+R${fmt(R * 3, 0)} at 1/2/3R</b></div>`);
     if (s.reasoning) rows.push(`<div class="ap-row"><span>WHY</span><b style="max-width:62%;font-family:var(--sans);font-size:11.5px">${esc(s.reasoning)}</b></div>`);
+    if (s.brain) rows.push(`<div class="ap-row"><span>BRAIN</span><b style="max-width:62%;font-family:var(--sans);font-size:11px">${esc('BRAIN[' + s.brain.grade + '] ' + s.brain.reasons.join(' · '))}</b></div>`);
   }
   if (a.trend === 'RANGE') rows.push(`<div class="ap-row"><span>WHY NO TRADE</span><b style="font-family:var(--sans);font-size:11.5px">Ranging market — buys in uptrends and sells in downtrends only.</b></div>`);
   if (!a.scenarios.length && a.trend !== 'RANGE') rows.push(`<div class="ap-row"><span>CONFIRMATION</span><b style="font-family:var(--sans);font-size:11.5px">No engulfing / rejection confirmed yet — levels marked awaiting confirmation.</b></div>`);
@@ -2227,13 +2296,14 @@ function renderDashboard() {
   $('#biasBand').textContent = a.trend === 'RANGE' ? 'ranging' : 'trend ' + a.trend;
   $('#biasTrend').textContent = a.trend;
   $('#biasSym').textContent = `${($('#symSelect') && $('#symSelect').value) || S.settings.symbol} · vision`;
-  $('#setupGrade').textContent = s0 ? (a.levels.length >= 3 ? 'A' : 'B') : '—';
+  $('#setupGrade').textContent = s0 ? (s0.brain ? s0.brain.grade : (a.levels.length >= 3 ? 'A' : 'B')) : '—';
   $('#setupBody').innerHTML = s0 ? `<div class="ap-grid">
       <div class="ap-big ${s0.direction}">${s0.direction} setup</div>
       <div class="ap-row buy"><span>ENTRY</span><b>${fmt(s0.entry, digits())}</b></div>
       <div class="ap-row sell"><span>SL</span><b>${fmt(s0.stopLoss, digits())}</b></div>
       <div class="ap-row"><span>TARGETS</span><b>${s0.targets.map(t => fmt(t, digits())).join(' · ')}</b></div>
       <div class="ap-row"><span>SIZE</span><b>${sizeFromScenario(s0).lots} lots</b></div>
+      ${s0.brain ? `<div class="ap-row"><span>BRAIN</span><b style="max-width:62%;font-family:var(--sans);font-size:11px">${esc('BRAIN[' + s0.brain.grade + '] ' + s0.brain.reasons.slice(0, 3).join(' · '))}</b></div>` : ''}
     </div>` : `<p class="muted"><b>WAIT.</b> ${a.trend === 'RANGE' ? 'Ranging market — no directional setups.' : 'No confirmed setup yet.'}</p>`;
   const rules = [
     { ok: a.trend !== 'RANGE', step: 'TREND FILTER', detail: a.trend === 'RANGE' ? 'ranging — stand aside' : `${a.trend} trend — ${a.trend === 'UP' ? 'buys' : 'sells'} only` },
