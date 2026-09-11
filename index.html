@@ -1612,7 +1612,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
 'use strict';
 
 /* ── auto-update: every device always ends up on the latest published build ── */
-const APP_VERSION = '13';
+const APP_VERSION = '14';
 function checkForUpdate() {
   if (typeof location === 'undefined' || location.protocol === 'file:' || typeof fetch !== 'function') return;
   fetch('https://raw.githubusercontent.com/saistarayub-hash/apex-insight-ai/main/index.html?cb=' + Date.now(), { cache: 'no-store' })
@@ -2345,6 +2345,12 @@ function renderPlan() {
     return;
   }
   const s = a.scenarios[0];
+  if (s.brain && s.brain.grade === 'WAIT') {
+    dir.textContent = 'WAIT — BRAIN VETO'; dir.className = 'plan-dir WAIT'; clear();
+    $('#planMeta').textContent = 'BRAIN vetoed this plan: ' + s.brain.reasons.slice(0, 2).join(' · ') + ' · analysis only, not advice';
+    if (pc) pc.innerHTML = '<b>NO TRADE ·</b> this plan failed the doctrine gates (RR floor / HTF clearance / liquidity window). Missing a trade costs nothing — wait for a setup that passes.';
+    return;
+  }
   const sign = s.direction === 'BUY' ? 1 : -1;
   const risk = Math.abs(s.entry - s.stopLoss);
   const tp2fallback = risk > 0 ? s.entry + risk * (S.settings.targetRR || 3) * sign : null;
@@ -2357,7 +2363,7 @@ function renderPlan() {
   set('planTP2', tp2 != null ? fmt(tp2, dg) : '—');
   const rr = risk > 0 && s.targets[0] != null ? Math.abs(s.targets[0] - s.entry) / risk : null;
   $('#planMeta').textContent =
-    `${s.direction} setup · risk ${fmt(risk, dg)} pts` +
+    `${s.direction} setup${s.brain ? ' · BRAIN ' + s.brain.grade + (s.brain.grade === 'B' ? ' (reduced size)' : '') : ''} · risk ${fmt(risk, dg)} pts` +
     (rr ? ` · TP1 ≈ 1:${rr.toFixed(1)}` : '') +
     ` · ${s.reasoning ? esc(s.reasoning) : 'wait for your own confirmation'} · analysis only, not advice`;
   if (pc) pc.innerHTML = s.direction === 'BUY'
