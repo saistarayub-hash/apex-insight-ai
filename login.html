@@ -45,7 +45,7 @@ $('go').addEventListener('click',async()=>{
     const j=await r.json().catch(()=>({}));
     if(!r.ok||!j.access_token){ $('err').textContent=j.error||('Login failed ('+r.status+')'); return; }
     localStorage.setItem('apex.auth.v1',JSON.stringify({access_token:j.access_token,refresh_token:j.refresh_token,email:j.email,profile:j.profile}));
-    location.href='./';
+    location.href='./?v=19';
   }catch(e){ $('err').textContent='Network error — try again'; }
   finally{ $('go').disabled=false; $('go').textContent=mode==='login'?'LOG IN':'CREATE ACCOUNT'; }
 });
