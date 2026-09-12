@@ -2088,7 +2088,7 @@ function visionEndpoint() { return visionEndpoints()[0]; }
 
 async function runVision() {
   if (!S.img) { toast('Upload a chart first'); return; }
-  if (S.uploads.used >= VISION_LIMIT) {
+  if (!S.auth && S.uploads.used >= VISION_LIMIT) {
     setHint(`Taster runs used (${VISION_LIMIT}). Unlimited AI is Pro — every local tool stays free.`);
     openWall();
     return;
@@ -2144,7 +2144,7 @@ async function runVision() {
     }
     S.vision = j.analysis;
     gradeVision(S.vision, allowScalping);
-    S.uploads.used += 1; save(LS.uploads, S.uploads);
+    if (!S.auth) { S.uploads.used += 1; save(LS.uploads, S.uploads); }
     redraw();
     renderVisionPanel();
     renderDashboard();
@@ -2378,7 +2378,9 @@ function renderVisionPanel() {
   if (a.trend === 'RANGE') rows.push(`<div class="ap-row"><span>WHY NO TRADE</span><b style="font-family:var(--sans);font-size:11.5px">Ranging market — buys in uptrends and sells in downtrends only.</b></div>`);
   if (!a.scenarios.length && a.trend !== 'RANGE') rows.push(`<div class="ap-row"><span>CONFIRMATION</span><b style="font-family:var(--sans);font-size:11.5px">No engulfing / rejection confirmed yet — levels marked awaiting confirmation.</b></div>`);
   rows.push(`<div class="ap-row"><span>LIVE PRICE</span><b>${S.livePrice != null ? fmt(S.livePrice, dg) : '— (feed connecting)'}</b></div>`);
-  rows.push(`<div class="ap-row"><span>TRIAL</span><b>${Math.max(0, VISION_LIMIT - S.uploads.used)} free analyses left on this device</b></div>`);
+  rows.push(S.auth
+    ? `<div class="ap-row"><span>TRIAL</span><b>unlimited — you're logged in ⚡</b></div>`
+    : `<div class="ap-row"><span>TRIAL</span><b>${Math.max(0, VISION_LIMIT - S.uploads.used)} free analyses left on this device</b></div>`);
   rows.push(`<div class="ap-row"><span>NOTE</span><b style="font-family:var(--sans);font-size:11px">Analysis only — not financial advice. The terminal never executes trades.</b></div>`);
   $('#analysisPanel').innerHTML = `<div class="ap-grid">${rows.join('')}</div>`;
   $('#anTime').textContent = new Date().toLocaleTimeString();
