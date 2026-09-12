@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>COBRA · Owner Cockpit</title>
+<style>
+ :root{--bg:#06090e;--panel:#0b1219;--panel2:#0e1620;--line:#182a3c;--txt:#dce8f2;--dim:#7d93a8;--gold:#e6b64f;--ok:#3ddc84;--bad:#ff5b6c;--cy:#00e5ff}
+ *{box-sizing:border-box}
+ body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 system-ui,-apple-system,sans-serif;padding:18px}
+ h1{font-size:16px;letter-spacing:.18em;color:var(--gold);margin:0}
+ h2{font-size:12px;letter-spacing:.12em;color:var(--cy);margin:0 0 10px;text-transform:uppercase}
+ .top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+ .top .sp{flex:1}
+ button,select,input{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px}
+ button{cursor:pointer}
+ button.pri{background:linear-gradient(135deg,#ffd97a,#e6b64f);color:#0b0e13;font-weight:800;border:none}
+ button.bad{border-color:#ff5b6c55;color:var(--bad)}
+ .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+ .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+ .kpi b{display:block;font-size:22px;color:var(--gold)}
+ .kpi span{font-size:11px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+ .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+ @media(max-width:900px){.grid{grid-template-columns:1fr}}
+ section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+ table{width:100%;border-collapse:collapse;font-size:12.5px}
+ th{color:var(--dim);text-align:left;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;letter-spacing:.06em}
+ td{padding:6px 8px;border-bottom:1px solid #101d2a;vertical-align:middle}
+ .pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700}
+ .p-lifetime{background:#e6b64f22;color:var(--gold)} .p-monthly{background:#3ddc8422;color:var(--ok)}
+ .p-weekly{background:#00e5ff22;color:var(--cy)} .p-member,.p-free{background:#7d93a822;color:var(--dim)}
+ .p-admin{background:#ff5b6c22;color:var(--bad)}
+ .mut{color:var(--dim);font-size:12px}
+ #gate{max-width:360px;margin:12vh auto;text-align:center}
+ .mini{padding:4px 8px;font-size:11px}
+ .err{color:var(--bad);font-size:12px} .okt{color:var(--ok);font-size:12px}
+ code{color:var(--cy);font-size:11px;word-break:break-all}
+</style></head>
+<body>
+<div id="gate" style="display:none">
+  <h1>COBRA · OWNER COCKPIT</h1>
+  <p class="mut">Enter the admin secret to continue</p>
+  <input id="sec" type="password" placeholder="ADMIN_SECRET" style="width:100%;margin:8px 0">
+  <button class="pri" style="width:100%" onclick="unlock()">UNLOCK</button>
+  <p class="err" id="gateErr"></p>
+</div>
+<div id="app" style="display:none">
+  <div class="top">
+    <h1>COBRA · OWNER COCKPIT</h1>
+    <div class="sp"></div>
+    <select id="hrs" onchange="go()"><option value="24">last 24h</option><option value="168" selected>last 7 days</option><option value="720">last 30 days</option></select>
+    <button onclick="go()">↻ refresh</button>
+    <button class="bad mini" onclick="localStorage.removeItem('cobra_admin');location.reload()">lock</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid">
+    <div>
+      <section><h2>💰 pending payments — approve / deny</h2><div id="pend" class="mut">—</div></section>
+      <section><h2>🔑 special access — grant / revoke</h2>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input id="gaEmail" placeholder="their account email" size="22">
+          <select id="gaPlan"><option value="weekly">weekly 8d</option><option value="monthly" selected>monthly 31d</option><option value="lifetime">lifetime</option></select>
+          <button class="pri" onclick="ga(false)">GRANT</button>
+          <button class="bad" onclick="ga(true)">REVOKE</button>
+        </div><p id="gaOut" class="mut" style="margin:8px 0 0">Grant = unlimited AI, no payment. Revoke = back to the paywall. Neither gives admin powers.</p>
+      </section>
+      <section><h2>🤖 AI engine (window)</h2><div id="bot" class="mut">—</div></section>
+      <section><h2>⚠️ errors (window)</h2><div id="errs" class="mut">—</div></section>
+    </div>
+    <div>
+      <section><h2>👥 all users</h2><div id="users" class="mut">—</div></section>
+      <section><h2>🧾 recent payments</h2><div id="pays" class="mut">—</div></section>
+      <section><h2>📲 VIP invites issued (window)</h2><div id="inv" class="mut">—</div></section>
+    </div>
+  </div>
+  <p class="mut" style="text-align:center;margin-top:18px">cockpit auto-refreshes every 45s · data comes from the server, never stored here</p>
+</div>
+<script>
+const FN='https://iynjyxwkgpqladdlmyvo.supabase.co/functions/v1';
+const K=()=>localStorage.cobra_admin||'';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function pill(p){return '<span class="pill p-'+esc(p)+'">'+esc(p||'free')+'</span>'}
+if(!K()){ $('gate').style.display='block' } else { $('app').style.display='block'; go(); setInterval(go,45000) }
+function unlock(){ const v=$('sec').value.trim(); if(!v)return;
+  fetch(FN+'/admin-stats?key='+encodeURIComponent(v)).then(r=>{ if(r.status===403){$('gateErr').textContent='wrong secret';return}
+    localStorage.cobra_admin=v; location.reload() }) }
+function callGrant(body){ return fetch(FN+'/admin-grant',{method:'POST',headers:{'content-type':'text/plain;charset=UTF-8'},body:JSON.stringify(Object.assign({key:K()},body))}).then(r=>r.json()) }
+function ga(rev){ const em=$('gaEmail').value.trim(); if(!em){$('gaOut').textContent='enter an email first';return}
+  if(rev && !confirm('Revoke special access for '+em+'?'))return
+  callGrant(rev?{email:em,revoke_access:true}:{email:em,item:$('gaPlan').value,note:'owner-granted special access'})
+   .then(j=>{ $('gaOut').textContent = rev ? (j.revoked?'✅ REVOKED — back on the paywall':'failed: '+(j.error||'?')) : (j.granted?'✅ GRANTED '+j.granted+' until '+String(j.until).slice(0,10):'failed: '+(j.error||'?')); go() }) }
+function approve(id,uid,item){ callGrant({uid,item,note:'board approve#'+id}).then(j=>{alert(j.granted?'approved ✅':'failed: '+(j.error||'?')); go()}) }
+function deny(id){ if(confirm('Deny payment #'+id+'?')) callGrant({deny:id}).then(()=>go()) }
+function rowGrant(email,plan){ $('gaEmail').value=email; ga(false) }
+function rowRevoke(email){ $('gaEmail').value=email; ga(true) }
+function go(){ if(!K())return
+ fetch(FN+'/admin-stats?key='+encodeURIComponent(K())+'&h='+$('hrs').value).then(r=>{
+  if(r.status===403){ localStorage.removeItem('cobra_admin'); location.reload(); return }
+  return r.json() }).then(j=>{ if(!j) return
+  const t=j.totals||{};
+  $('kpis').innerHTML=[
+   ['users',(j.users||[]).length],['active paid',(j.users||[]).filter(u=>u.active).length],
+   ['revenue (window)','R'+(+j.revenue||0).toLocaleString()],['pending',(j.pending_eft||[]).length],
+   ['ai success',(j.bot?.success_pct??100)+'%'],['errors',(j.errors||[]).length]
+  ].map(k=>'<div class="kpi"><b>'+esc(k[1])+'</b><span>'+esc(k[0])+'</span></div>').join('')
+  $('pend').innerHTML=(j.pending_eft||[]).length?'<table><tr><th>#</th><th>who</th><th>item</th><th>amt</th><th>when</th><th></th></tr>'+
+   j.pending_eft.map(p=>'<tr><td>'+p.id+'</td><td><code>'+esc(p.user_id?String(p.user_id).slice(0,8):'?')+'</code>'+(p.email?'<br>'+esc(p.email):'')+'</td><td>'+esc(p.item)+'</td><td>R'+esc(p.amount)+'</td><td class="mut">'+esc(String(p.created_at||'').slice(5,16).replace('T',' '))+'</td><td><button class="mini pri" onclick="approve('+p.id+',\''+p.user_id+'\',\''+esc(p.item)+'\')">approve</button> <button class="mini bad" onclick="deny('+p.id+')">deny</button></td></tr>').join('')+'</table>':'<span class="mut">nothing waiting 🎉</span>'
+  $('users').innerHTML='<table><tr><th>email</th><th>plan</th><th>role</th><th>until</th><th></th></tr>'+
+   (j.users||[]).map(u=>'<tr><td>'+esc(u.email)+'</td><td>'+pill(u.plan)+'</td><td>'+(u.role==='admin'?'<span class="pill p-admin">admin</span>':'<span class="mut">user</span>')+'</td><td class="mut">'+(u.plan==='lifetime'?'forever':u.active?esc(String(u.paid_until||'').slice(0,10)):'—')+'</td><td style="white-space:nowrap"><button class="mini" onclick="rowGrant(\''+esc(u.email)+'\')">grant</button> <button class="mini bad" onclick="rowRevoke(\''+esc(u.email)+'\')">revoke</button></td></tr>').join('')+'</table>'
+  $('pays').innerHTML=(j.recent_payments||[]).length?'<table><tr><th>when</th><th>provider</th><th>item</th><th>amt</th><th>status</th></tr>'+
+   j.recent_payments.map(p=>'<tr><td class="mut">'+esc(String(p.created_at||'').slice(5,16).replace('T',' '))+'</td><td>'+esc(p.provider)+'</td><td>'+esc(p.item)+'</td><td>R'+esc(p.amount)+'</td><td>'+(p.status==='paid'?'<span class="okt">paid</span>':p.status==='pending'?'<span style="color:var(--gold)">pending</span>':'<span class="err">'+esc(p.status)+'</span>')+'</td></tr>').join('')+'</table>':'<span class="mut">no payments yet</span>'
+  $('bot').innerHTML='analyses: <b>'+(j.bot?.boosts??0)+'</b> · success <b>'+(j.bot?.success_pct??100)+'%</b> · median <b>'+(j.bot?.p50_ms??0)+'ms</b> · p95 <b>'+(j.bot?.p95_ms??0)+'ms</b>'
+  $('errs').innerHTML=(j.errors||[]).length?'<table><tr><th>when</th><th>what</th><th>detail</th></tr>'+j.errors.map(e=>'<tr><td class="mut">'+esc(String(e.at||'').slice(5,16).replace('T',' '))+'</td><td>'+esc(e.kind)+'</td><td class="err">'+esc(e.detail||'')+'</td></tr>').join('')+'</table>':'<span class="okt">all clean ✅</span>'
+  $('inv').innerHTML=(j.invites||[]).length?j.invites.map(i=>'<div class="mut">'+esc(String(i.tg_invite_at||'').slice(5,16).replace('T',' '))+' · '+esc(i.handle||'')+'</div>').join(''):'<span class="mut">none in window</span>'
+ }) }
+</script></body></html>
