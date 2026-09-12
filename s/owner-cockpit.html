@@ -67,7 +67,8 @@
       <section><h2>⚠️ errors (window)</h2><div id="errs" class="mut">—</div></section>
     </div>
     <div>
-      <section><h2>👥 all users</h2><div id="users" class="mut">—</div></section>
+      <section><h2>👥 all users — every signup gets a profile, you control them all</h2>
+<div style="margin-bottom:8px"><button class="bad mini" onclick="purge()"> purge accounts expired 30+ days ago</button> <span id="purgeOut" class="mut"></span></div><div id="users" class="mut">—</div></section>
       <section><h2>🧾 recent payments</h2><div id="pays" class="mut">—</div></section>
       <section><h2>📲 VIP invites issued (window)</h2><div id="inv" class="mut">—</div></section>
     </div>
@@ -89,6 +90,13 @@ function ga(rev){ const em=$('gaEmail').value.trim(); if(!em){$('gaOut').textCon
   if(rev && !confirm('Revoke special access for '+em+'?'))return
   callGrant(rev?{email:em,revoke_access:true}:{email:em,item:$('gaPlan').value,note:'owner-granted special access'})
    .then(j=>{ $('gaOut').textContent = rev ? (j.revoked?'✅ REVOKED — back on the paywall':'failed: '+(j.error||'?')) : (j.granted?'✅ GRANTED '+j.granted+' until '+String(j.until).slice(0,10):'failed: '+(j.error||'?')); go() }) }
+function rowSet(email,cur){ const plan=prompt('Plan for '+email+' (weekly/monthly/lifetime/member):',cur||'monthly'); if(plan===null)return
+  let until=prompt('Expiry date (YYYY-MM-DD), or blank for none / lifetime:',''); if(until===null)return
+  callGrant({email,plan,until,set_until:true}).then(j=>{alert(j.updated?'updated ✅':'failed: '+(j.error||'?')); go()}) }
+function rowDel(email){ if(!confirm('PERMANENTLY DELETE the account '+email+'? They can never log in again.'))return
+  callGrant({email,delete_user:true}).then(j=>{alert(j.deleted?'deleted 🗑':'failed: '+(j.error||'?')); go()}) }
+function purge(){ if(!confirm('Delete ALL accounts whose subscription ended 30+ days ago? Admins & lifetime are never touched.'))return
+  callGrant({purge_expired:true}).then(j=>{ $('purgeOut').textContent='purged '+j.purged+' expired account(s)'; go() }) }
 function approve(id,uid,item){ callGrant({uid,item,note:'board approve#'+id}).then(j=>{alert(j.granted?'approved ✅':'failed: '+(j.error||'?')); go()}) }
 function deny(id){ if(confirm('Deny payment #'+id+'?')) callGrant({deny:id}).then(()=>go()) }
 function rowGrant(email,plan){ $('gaEmail').value=email; ga(false) }
