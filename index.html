@@ -951,7 +951,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
       <div class="pro-card"><b>LIFETIME</b><span>R1999 once</span><small>Forever · VIP Telegram · priority support</small><button class="btn" id="pfLifetime">Pay R1999</button></div>
     </div>
     <p class="muted hidden" id="pfSandboxNote">Sandbox mode ON — no real money moves.</p>
-    <div class="eft-box"><b>Instant EFT / Capitec (2% cheaper)</b><p class="muted" id="eftDetailsTxt"></p><button class="btn ghost" id="eftBtn">I've paid — queue for approval</button><div id="eftOut" class="muted"></div></div>
+    <div class="eft-box"><b>PayPal / EFT — pay direct, approved within minutes</b><p class="muted" id="eftDetailsTxt"></p><button class="btn ghost" id="eftBtn">I've paid — queue for approval</button><div id="eftOut" class="muted"></div></div>
   </div>
 </div>
 
@@ -1684,7 +1684,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
 'use strict';
 
 /* ── auto-update: every device always ends up on the latest published build ── */
-const APP_VERSION = '16';
+const APP_VERSION = '17';
 function checkForUpdate() {
   if (typeof location === 'undefined' || location.protocol === 'file:' || typeof fetch !== 'function') return;
   fetch('https://raw.githubusercontent.com/saistarayub-hash/apex-insight-ai/main/index.html?cb=' + Date.now(), { cache: 'no-store' })
@@ -2825,7 +2825,7 @@ function payfastForm(item, amount) {
 }
 function renderProPanel() {
   const t = $('#eftDetailsTxt');
-  if (t) t.textContent = S.settings.eftDetails || 'EFT details not set yet — the owner adds them in Settings.';
+  if (t) t.textContent = S.settings.eftDetails || 'Payment details not set yet — PayPal link / bank details appear here.';
   const sb = $('#pfSandboxNote');
   if (sb) sb.classList.toggle('hidden', !S.settings.pfSandbox);
 }
