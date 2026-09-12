@@ -39,7 +39,16 @@ function render(d){
    <div class="k"><b>${b.p50_ms}ms</b><span>p50 · p95 ${b.p95_ms}ms</span></div>
    <div class="k"><b>${d.paid.length}</b><span>active subs</span></div></div>`
   h += `<section>hour filter <select id="hr" onchange="go()"><option>1</option><option selected>24</option><option>168</option></select> · refresh 30s</section>`
-  h += tbl('pending EFT — approve = grant', d.pending_eft, r => `<td>${new Date(r.created_at).toLocaleString()}</td><td>${r.note || ''}</td><td>${r.amount}</td>
+  h += `
+<section><h3 style="font-size:12px;color:#00e5ff">special access — grant / revoke unlimited (NO admin powers, software untouchable)</h3>
+<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0">
+<input id="gaEmail" placeholder="their account email" size="24">
+<select id="gaPlan"><option value="weekly">weekly (8d)</option><option value="monthly" selected>monthly (31d)</option><option value="lifetime">lifetime</option></select>
+<button onclick="grantFree()">grant access</button>
+<button onclick="revokeFree()" style="border-color:#ff5b6c55;color:#ff5b6c">revoke access</button>
+<span id="gaOut" class="ok" style="font-size:12px"></span></div></section>
+`
+h += tbl('pending EFT — approve = grant', d.pending_eft, r => `<td>${new Date(r.created_at).toLocaleString()}</td><td>${r.note || ''}</td><td>${r.amount}</td>
       <td><select id="it${r.id}"><option>weekly</option><option>monthly</option><option>lifetime</option></select>
       <input id="em${r.id}" placeholder="paid email" size="16"><button onclick="grant(${r.id})">approve</button> <button onclick="deny(${r.id})">✕</button></td>`)
   h += tbl('paid members', d.paid, r => `<td>@${r.handle}</td><td>${r.plan}</td><td>${new Date(r.paid_until).toLocaleDateString()}</td><td>${r.boosts_hr}/hr ${r.boosts_day}/day</td>
@@ -51,6 +60,22 @@ function render(d){
   document.getElementById('app').innerHTML = h
 }
 function tbl(title, rows, f){ return `<section><h3 style="font-size:12px;color:#00e5ff">${title} · ${rows.length}</h3><table>` + (rows.map(r => '<tr>' + f(r) + '</tr>').join('') || '<tr><td>—</td></tr>') + '</table></section>' }
+
+function grantFree(){
+  const sec=localStorage.cobra_admin, em=document.getElementById('gaEmail').value.trim();
+  if(!em){ alert('enter their email'); return }
+  fetch(FN+'/admin-grant',{method:'POST',headers:{'content-type':'text/plain;charset=UTF-8'},
+    body:JSON.stringify({key:sec,email:em,item:document.getElementById('gaPlan').value,note:'owner-granted special access'})})
+  .then(r=>r.json()).then(j=>{ document.getElementById('gaOut').textContent=j.granted?('GRANTED '+j.granted+' until '+String(j.until).slice(0,10)):('failed: '+(j.error||'?')); go() })
+}
+function revokeFree(){
+  const sec=localStorage.cobra_admin, em=document.getElementById('gaEmail').value.trim();
+  if(!em){ alert('enter their email'); return }
+  if(!confirm('Revoke special access for '+em+'? They drop back to the free paywall.')) return
+  fetch(FN+'/admin-grant',{method:'POST',headers:{'content-type':'text/plain;charset=UTF-8'},
+    body:JSON.stringify({key:sec,email:em,revoke_access:true})})
+  .then(r=>r.json()).then(j=>{ document.getElementById('gaOut').textContent=j.revoked?'REVOKED — they are back on the paywall':('failed: '+(j.error||'?')); go() })
+}
 function grant(id){ const sec = localStorage.cobra_admin; fetch(FN + '/admin-grant', { method: 'POST', headers: { 'content-type': 'text/plain;charset=UTF-8' },   // simple request; key lives in the body
   body: JSON.stringify({ key: sec, email: document.getElementById('em' + id).value.trim(), item: document.getElementById('it' + id).value, note: 'approve#' + id }) }).then(r => r.json()).then(j => { alert(JSON.stringify(j)); go() }) }
 function deny(id){ fetch(FN + '/admin-grant', { method: 'POST', headers: { 'content-type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({ key: localStorage.cobra_admin, deny: id }) }).then(go) }
