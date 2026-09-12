@@ -1684,7 +1684,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
 'use strict';
 
 /* ── auto-update: every device always ends up on the latest published build ── */
-const APP_VERSION = '19';
+const APP_VERSION = '20';
 function checkForUpdate() {
   if (typeof location === 'undefined' || location.protocol === 'file:' || typeof fetch !== 'function') return;
   fetch('https://raw.githubusercontent.com/saistarayub-hash/apex-insight-ai/main/index.html?cb=' + Date.now(), { cache: 'no-store' })
@@ -2872,6 +2872,11 @@ function boot() {
   renderAuthPanel();
   renderProPanel();
   refreshMe();
+  // stale-cache killer: if a newer build exists, reload into it once
+  (async () => { try {
+    const v = await fetch('version.json?n=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).catch(() => null);
+    if (v && v.v && v.v !== APP_VERSION && !sessionStorage.getItem('apex.upd')) { sessionStorage.setItem('apex.upd', '1'); location.reload(); }
+  } catch (e) {} })();
   if (typeof location !== 'undefined' && location.search.indexOf('paid=1') >= 0) toast('Payment received — Pro unlocks within a minute');
   checkForUpdate();
 }
