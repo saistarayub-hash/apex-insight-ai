@@ -860,6 +860,7 @@ body[data-theme="crimson"] .bg-glow{background:radial-gradient(700px 420px at 12
           <label class="field"><span>PayFast Merchant ID (owner — enables the pay buttons)</span><input name="pfId" type="text" autocomplete="off" placeholder="10000100"></label>
           <label class="field"><span>PayFast Merchant Key (owner)</span><input name="pfKey" type="password" autocomplete="off" placeholder="46f0cd694581a"></label>
           <label class="field"><span>PayFast mode</span><select name="pfSandbox"><option value="0">Live</option><option value="1">Sandbox (testing)</option></select></label>
+          <label class="field"><span>Paystack PUBLIC key (preferred — R0/month cards; takes priority over PayFast)</span><input name="psKey" type="text" autocomplete="off" placeholder="pk_live_…"></label>
           <label class="field"><span>EFT banking details shown on the Pro panel</span><input name="eftDetails" type="text" autocomplete="off" placeholder="Bank · account · branch · reference = your email"></label>
           <label class="field"><span>Theme</span>
             <select name="theme">
@@ -1683,7 +1684,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
 'use strict';
 
 /* ── auto-update: every device always ends up on the latest published build ── */
-const APP_VERSION = '15';
+const APP_VERSION = '16';
 function checkForUpdate() {
   if (typeof location === 'undefined' || location.protocol === 'file:' || typeof fetch !== 'function') return;
   fetch('https://raw.githubusercontent.com/saistarayub-hash/apex-insight-ai/main/index.html?cb=' + Date.now(), { cache: 'no-store' })
@@ -2164,9 +2165,9 @@ if ($('#wallSend')) $('#wallSend').addEventListener('click', sendMagicLink);
 if ($('#authSend')) $('#authSend').addEventListener('click', sendMagicLink);
 if ($('#wallAuth')) $('#wallAuth').addEventListener('click', () => { renderAuthPanel(); openPanel('#authPanel'); });
 if ($('#wallPro')) $('#wallPro').addEventListener('click', () => { renderProPanel(); openPanel('#proPanel'); });
-if ($('#pfWeekly')) $('#pfWeekly').addEventListener('click', () => payfastForm('weekly', 149));
-if ($('#pfMonthly')) $('#pfMonthly').addEventListener('click', () => payfastForm('monthly', 399));
-if ($('#pfLifetime')) $('#pfLifetime').addEventListener('click', () => payfastForm('lifetime', 1999));
+if ($('#pfWeekly')) $('#pfWeekly').addEventListener('click', () => payForm('weekly', 149));
+if ($('#pfMonthly')) $('#pfMonthly').addEventListener('click', () => payForm('monthly', 399));
+if ($('#pfLifetime')) $('#pfLifetime').addEventListener('click', () => payForm('lifetime', 1999));
 if ($('#proBtn2')) $('#proBtn2').addEventListener('click', () => { renderProPanel(); openPanel('#proPanel'); });
 if ($('#logoutBtn')) $('#logoutBtn').addEventListener('click', () => { S.auth = null; save(LS.auth, null); renderAuthChip(); renderAuthPanel(); toast('Logged out'); });
 if ($('#vipBtn')) $('#vipBtn').addEventListener('click', async () => {
@@ -2675,6 +2676,7 @@ $('#settingsForm').addEventListener('submit', (e) => {
   if (f.pfKey) S.settings.pfKey = f.pfKey.value.trim();
   if (f.eftDetails) S.settings.eftDetails = f.eftDetails.value.trim();
   if (f.pfSandbox) S.settings.pfSandbox = f.pfSandbox.value === '1';
+  if (f.psKey) S.settings.psKey = f.psKey.value.trim();
   renderProPanel();
   S.settings.broker = f.broker.value;
   S.settings.sound = f.sound.checked;
@@ -2779,6 +2781,38 @@ function renderAuthPanel() {
   if (vip) vip.classList.toggle('hidden', !paidActive(S.auth.profile));
   if (up) up.classList.toggle('hidden', !!paidActive(S.auth.profile));
 }
+function loadPaystackJs() {
+  return new Promise((res, rej) => {
+    if (typeof PaystackPop !== 'undefined') return res();
+    const sc = document.createElement('script');
+    sc.src = 'https://js.paystack.co/v1/inline.js';
+    sc.onload = res; sc.onerror = () => rej(new Error('blocked'));
+    document.head.appendChild(sc);
+  });
+}
+function payForm(item, amount) {
+  const ps = (S.settings.psKey || '').trim();
+  if (ps) { paystackPay(ps, item, amount); return; }
+  payfastForm(item, amount);
+}
+async function paystackPay(key, item, amount) {
+  if (!S.auth || !S.auth.uid) { toast('Log in first — the payment attaches to your account'); renderAuthPanel(); openPanel('#authPanel'); return; }
+  try { await loadPaystackJs(); } catch (e) { toast('Could not load Paystack — check your connection'); return; }
+  const ref = 'cobra_' + S.auth.uid + '_' + item + '_' + Date.now();
+  const handler = PaystackPop.setup({
+    key, email: S.auth.email || '', amount: Math.round(amount * 100), currency: 'ZAR', ref,
+    metadata: { custom_fields: [{ display_name: 'Plan', variable_name: 'plan', value: item }] },
+    callback: async (resp) => {
+      toast('Verifying payment…');
+      const r = await fetch(FN_BASE + '/paystack-verify', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({ auth: S.auth.access_token, reference: resp.reference }) });
+      const j = await r.json().catch(() => ({}));
+      if (j.granted) { toast('Paid — Pro unlocked ⚡'); await refreshMe(); renderAuthPanel(); }
+      else toast(j.error || 'Payment not confirmed — if money left your account, contact support');
+    },
+    onClose: () => toast('Payment window closed — nothing was charged'),
+  });
+  handler.openIframe();
+}
 function payfastForm(item, amount) {
   const pfId = (S.settings.pfId || '').trim(), pfKey = (S.settings.pfKey || '').trim();
   if (!pfId || !pfKey) { toast('PayFast keys not set — use EFT (Settings holds merchant keys)'); return; }
@@ -2812,6 +2846,7 @@ function boot() {
   if (sf.pfKey) sf.pfKey.value = S.settings.pfKey || '';
   if (sf.eftDetails) sf.eftDetails.value = S.settings.eftDetails || '';
   if (sf.pfSandbox) sf.pfSandbox.value = S.settings.pfSandbox ? '1' : '0';
+  if (sf.psKey) sf.psKey.value = S.settings.psKey || '';
   $('#goalForm').goal.value = S.settings.dailyGoal; $('#goalForm').limit.value = S.settings.dailyLossLimit;
   tickClock();
   renderDashboard(); renderCalc(); renderGoal(); renderJournal();
