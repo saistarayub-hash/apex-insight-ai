@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>COBRA · Login</title>
+<style>
+ :root{--bg:#070b10;--panel:#0b1219;--line:#16283a;--txt:#dce8f2;--dim:#7d93a8;--gold:#e6b64f}
+ *{box-sizing:border-box}
+ body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--txt);font:14px/1.5 system-ui,-apple-system,sans-serif;padding:16px}
+ .card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px 22px}
+ h1{margin:0 0 4px;font-size:18px;letter-spacing:.14em;color:var(--gold)}
+ p.sub{margin:0 0 18px;color:var(--dim);font-size:12.5px}
+ input{width:100%;margin:7px 0;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:12px;font-size:14px}
+ button.main{width:100%;margin:12px 0 6px;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,#ffd97a,#e6b64f);color:#0b0e13;font-weight:800;font-size:14px;cursor:pointer;letter-spacing:.04em}
+ .toggle{width:100%;background:none;border:none;color:var(--dim);font-size:12.5px;cursor:pointer;padding:6px}
+ .toggle b{color:var(--gold)}
+ .err{color:#ff5b6c;font-size:12.5px;min-height:18px;margin-top:4px}
+ a.back{display:block;text-align:center;margin-top:14px;color:var(--dim);font-size:12.5px;text-decoration:none}
+</style></head>
+<body><div class="card">
+  <h1>COBRA AI TERMINAL</h1>
+  <p class="sub" id="modeText">Log in — your Pro subscription unlocks unlimited AI analysis.</p>
+  <input id="email" type="email" placeholder="Email" autocomplete="email">
+  <input id="pass" type="password" placeholder="Password (min 8 characters)" autocomplete="current-password">
+  <button class="main" id="go">LOG IN</button>
+  <button class="toggle" id="switch">No account? <b>Create one — free</b></button>
+  <div class="err" id="err"></div>
+  <a class="back" href="./">← back to the terminal</a>
+</div>
+<script>
+const FN='https://iynjyxwkgpqladdlmyvo.supabase.co/functions/v1';
+let mode='login';
+const $=id=>document.getElementById(id);
+$('switch').addEventListener('click',()=>{ mode=mode==='login'?'signup':'login';
+  $('go').textContent=mode==='login'?'LOG IN':'CREATE ACCOUNT';
+  $('modeText').textContent=mode==='login'?'Log in — your Pro subscription unlocks unlimited AI analysis.':'Create your free account — 5 AI taster runs + every local tool. Pro unlocks unlimited AI.';
+  $('switch').innerHTML=mode==='login'?'No account? <b>Create one — free</b>':'Have an account? <b>Log in</b>';
+});
+$('go').addEventListener('click',async()=>{
+  $('err').textContent='';
+  const email=$('email').value.trim(), password=$('pass').value;
+  if(!email||!password){ $('err').textContent='Enter email and password'; return; }
+  $('go').disabled=true; $('go').textContent='…';
+  try{
+    const r=await fetch(FN+'/auth-relay',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({mode,email,password})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.access_token){ $('err').textContent=j.error||('Login failed ('+r.status+')'); return; }
+    localStorage.setItem('apex.auth.v1',JSON.stringify({access_token:j.access_token,refresh_token:j.refresh_token,email:j.email,profile:j.profile}));
+    location.href='./?v=19';
+  }catch(e){ $('err').textContent='Network error — try again'; }
+  finally{ $('go').disabled=false; $('go').textContent=mode==='login'?'LOG IN':'CREATE ACCOUNT'; }
+});
+</script></body></html>
