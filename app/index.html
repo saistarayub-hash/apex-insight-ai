@@ -2183,7 +2183,7 @@ if ($('#vipBtn')) $('#vipBtn').addEventListener('click', async () => {
 if ($('#eftBtn')) $('#eftBtn').addEventListener('click', async () => {
   const out = $('#eftOut');
   if (!S.auth) { toast('Log in first'); renderAuthPanel(); openPanel('#authPanel'); return; }
-  const j = await relay({ mode: 'eft', auth: S.auth.access_token, item: 'monthly' });
+  const j = await relay({ mode: 'eft', auth: S.auth.access_token, item: S._payItem || 'monthly' });
   if (out) out.textContent = j.queued ? 'Queued — you go Pro the moment the payment is confirmed.' : ('Could not queue: ' + (j.error || 'try again'));
 });
 
@@ -2805,10 +2805,19 @@ function loadPaystackJs() {
     document.head.appendChild(sc);
   });
 }
+const PAYPAL_MID = '9UTX87JAUFEJC';
+const PAYPAL_USD = { weekly: '8.00', monthly: '22.00', lifetime: '110.00' };
+function paypalPay(item) {
+  S._payItem = item;
+  const url = 'https://www.paypal.me/saistar600/' + (PAYPAL_USD[item] || '22.00').replace('.00','') + 'USD';
+  window.open(url, '_blank');
+  toast('PayPal opened — after paying, tap the queue button below');
+}
 function payForm(item, amount) {
+  S._payItem = item;
   const ps = (S.settings.psKey || '').trim();
   if (ps) { paystackPay(ps, item, amount); return; }
-  payfastForm(item, amount);
+  paypalPay(item);
 }
 async function paystackPay(key, item, amount) {
   if (!S.auth || !S.auth.uid) { toast('Log in first — the payment attaches to your account'); renderAuthPanel(); openPanel('#authPanel'); return; }
@@ -2840,7 +2849,7 @@ function payfastForm(item, amount) {
 }
 function renderProPanel() {
   const t = $('#eftDetailsTxt');
-  if (t) t.textContent = S.settings.eftDetails || 'Payment details not set yet — PayPal link / bank details appear here.';
+  if (t) t.textContent = S.settings.eftDetails || 'PayPal: paypal.me/saistar600 · reference = your login email. Or tap a Pay button, then queue below.';
   const sb = $('#pfSandboxNote');
   if (sb) sb.classList.toggle('hidden', !S.settings.pfSandbox);
 }
