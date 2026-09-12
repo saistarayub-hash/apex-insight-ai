@@ -917,10 +917,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
     <h3>Go Pro — unlimited AI analysis</h3>
     <p class="muted">Your taster runs are done. <b>Pro = unlimited AI reads + VIP Telegram</b> — R149/week · R399/month · R1999 lifetime. Every local tool (clock, killzones, journal, sizing, live prices) stays free forever.</p>
     <button class="btn" id="wallPro">See Pro plans →</button>
-    <p class="muted" style="margin-top:10px">Already Pro? Log in with one magic-link email:</p>
-    <input id="wallEmail" type="email" placeholder="you@email.com">
-    <button class="btn ghost" id="wallSend">Send magic link</button>
-    <button class="btn ghost" id="wallAuth">Account / login options</button>
+    <button class="btn ghost" id="wallLogin">Already a member? Log in</button>
   </div>
 </div>
 <div class="overlay hidden" id="authPanel">
@@ -928,9 +925,8 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
     <button class="sheet-x" id="authClose">✕</button>
     <h3>Account</h3>
     <div id="authLoggedOut">
-      <p class="muted">Log in — attaches your Pro subscription (or taster progress) on this device. One magic-link email, no password.</p>
-      <input id="authEmail" type="email" placeholder="you@email.com">
-      <button class="btn" id="authSend">Send magic link</button>
+      <p class="muted">Log in — attaches your Pro subscription on this device. Email + password, no waiting on links.</p>
+      <button class="btn" id="authGoLogin">Log in / Create account</button>
     </div>
     <div id="authLoggedIn" class="hidden">
       <p class="muted" id="authMe"></p>
@@ -948,7 +944,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
     <div class="pro-grid">
       <div class="pro-card"><b>FREE</b><span>R0 · no login needed</span><small>5 AI taster runs + every local tool: SAST clock, killzones, journal, sizing, live prices — free forever</small></div>
       <div class="pro-card"><b>WEEKLY</b><span>R149 · 8 days</span><small>No throttles · BYOK lane · VIP Telegram</small><button class="btn" id="pfWeekly">Pay R149</button></div>
-      <div class="pro-card"><b>MONTHLY</b><span>R399 · 31 days</span><small>Everything in weekly</small><button class="btn" id="pfMonthly">Pay R399</button></div>
+      <div class="pro-card pop"><b>MONTHLY</b><span>R399 · 31 days</span><small>BEST VALUE · everything in weekly</small><button class="btn" id="pfMonthly">Pay R399</button></div>
       <div class="pro-card"><b>LIFETIME</b><span>R1999 once</span><small>Forever · VIP Telegram · priority support</small><button class="btn" id="pfLifetime">Pay R1999</button></div>
     </div>
     <p class="muted hidden" id="pfSandboxNote">Sandbox mode ON — no real money moves.</p>
@@ -1685,7 +1681,7 @@ python mt5/mt5_bridge.py --url http://localhost:8080</pre>
 'use strict';
 
 /* ── auto-update: every device always ends up on the latest published build ── */
-const APP_VERSION = '18';
+const APP_VERSION = '19';
 function checkForUpdate() {
   if (typeof location === 'undefined' || location.protocol === 'file:' || typeof fetch !== 'function') return;
   fetch('https://raw.githubusercontent.com/saistarayub-hash/apex-insight-ai/main/index.html?cb=' + Date.now(), { cache: 'no-store' })
@@ -1740,6 +1736,7 @@ const S = {
   last: load(LS.last, null),
   uploads: load(LS.uploads, { used: 0 }),
   byok: load(LS.byok, { key: '' }),
+  auth: load(LS.auth, null),
   livePrice: null,
   img: null, canvas: null, ctx: null, base: null, scale: 1,
   vision: null,           // the vision model's analysis (contract object)
@@ -2127,7 +2124,11 @@ async function runVision() {
     }
     if (!r || !r.ok) {
       if (j && j.error === 'trial-exhausted') { setHint('Taster runs used — unlimited AI is Pro.'); openWall(); return; }
-      if (j && j.error === 'pro-required') { setHint('Unlimited AI is a Pro feature — every local tool stays free.'); renderProPanel(); openPanel('#proPanel'); return; }
+      if (j && j.error === 'pro-required') {
+        if (!S._retried402 && await tryTokenRefresh()) { S._retried402 = true; return runVision(); }
+        S._retried402 = false;
+        setHint('Unlimited AI is a Pro feature — every local tool stays free.'); renderProPanel(); openPanel('#proPanel'); return;
+      }
       if (j && j.error === 'rate-capped') {
         const mins = Math.ceil((j.resets_in_s || 600) / 60);
         setHint(`You've used your free runs this hour — unlimited resets in ${mins}m, or go Pro to never see this.`);
@@ -2163,9 +2164,8 @@ async function runVision() {
 $('#btnAnalyze').addEventListener('click', runVision);
 if ($('#authChip')) $('#authChip').addEventListener('click', () => { renderAuthPanel(); openPanel('#authPanel'); });
 ['#wallClose', '#authClose', '#proClose'].forEach(id => { const n = $(id); if (n) n.addEventListener('click', closePanels); });
-if ($('#wallSend')) $('#wallSend').addEventListener('click', sendMagicLink);
-if ($('#authSend')) $('#authSend').addEventListener('click', sendMagicLink);
-if ($('#wallAuth')) $('#wallAuth').addEventListener('click', () => { renderAuthPanel(); openPanel('#authPanel'); });
+if ($('#wallLogin')) $('#wallLogin').addEventListener('click', goLogin);
+if ($('#authGoLogin')) $('#authGoLogin').addEventListener('click', goLogin);
 if ($('#wallPro')) $('#wallPro').addEventListener('click', () => { renderProPanel(); openPanel('#proPanel'); });
 if ($('#pfWeekly')) $('#pfWeekly').addEventListener('click', () => payForm('weekly', 149));
 if ($('#pfMonthly')) $('#pfMonthly').addEventListener('click', () => payForm('monthly', 399));
@@ -2752,25 +2752,33 @@ function renderAuthChip() {
 function openPanel(id) { ['#wallPanel', '#authPanel', '#proPanel'].forEach(p => { const n = $(p); if (n) n.classList.add('hidden'); }); const n = $(id); if (n) n.classList.remove('hidden'); }
 function closePanels() { ['#wallPanel', '#authPanel', '#proPanel'].forEach(p => { const n = $(p); if (n) n.classList.add('hidden'); }); }
 function openWall() { openPanel('#wallPanel'); }
+async function tryTokenRefresh() {
+  if (!S.auth || !S.auth.refresh_token) return false;
+  const r2 = await relay({ mode: 'refresh', refresh_token: S.auth.refresh_token });
+  if (r2 && r2.access_token) {
+    S.auth = { access_token: r2.access_token, refresh_token: r2.refresh_token, email: r2.email || S.auth.email, profile: r2.profile || S.auth.profile, uid: S.auth.uid };
+    save(LS.auth, S.auth);
+    return true;
+  }
+  S.auth = null; save(LS.auth, null); renderAuthChip();
+  return false;
+}
 async function refreshMe() {
   if (!S.auth || !S.auth.access_token) { renderAuthChip(); return; }
-  const j = await relay({ mode: 'me', auth: S.auth.access_token });
-  if (j && j.uid) { S.auth.uid = j.uid; S.auth.email = j.email; S.auth.profile = j.profile; save(LS.auth, S.auth); }
+  let j = await relay({ mode: 'me', auth: S.auth.access_token });
+  if (j && j.error === 'invalid session' && await tryTokenRefresh()) j = await relay({ mode: 'me', auth: S.auth.access_token });
+  if (j && j.uid) { S.auth.uid = j.uid; S.auth.email = S.auth.email || j.email; S.auth.profile = j.profile; save(LS.auth, S.auth); }
   else if (j && j.error === 'invalid session') { S.auth = null; save(LS.auth, null); }
   renderAuthChip();
 }
 function parseHashAuth() {
   if (typeof location === 'undefined' || !location.hash || location.hash.indexOf('access_token=') < 0) return;
   const m = location.hash.match(/access_token=([^&]+)/);
-  if (m) { S.auth = { access_token: m[1] }; save(LS.auth, S.auth); history.replaceState(null, '', location.pathname + location.search); toast('Logged in — unlimited AI unlocked'); }
+  if (m) { const rt = location.hash.match(/refresh_token=([^&]+)/); S.auth = { access_token: m[1], refresh_token: rt ? rt[1] : null }; save(LS.auth, S.auth); history.replaceState(null, '', location.pathname + location.search); toast('Logged in — unlimited AI unlocked'); }
 }
-async function sendMagicLink() {
-  const inp = $('#wallEmail') || $('#authEmail');
-  const email = inp ? inp.value.trim() : '';
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('Enter a valid email'); return; }
-  toast('Sending magic link…');
-  const j = await relay({ mode: 'otp', email, redirect: typeof location !== 'undefined' ? location.href.split('#')[0] : undefined });
-  toast(j && j.sent ? 'Check your inbox — tap the link to log in' : ('Could not send: ' + ((j && j.error) || 'try again')));
+function goLogin() {
+  if (typeof location !== 'undefined' && location.protocol === 'file:') { toast('Login lives on the web version — open your site link'); return; }
+  location.href = 'login.html';
 }
 function renderAuthPanel() {
   const lo = $('#authLoggedOut'), li = $('#authLoggedIn');
