@@ -71,6 +71,7 @@
 <div style="margin-bottom:8px"><button class="bad mini" onclick="purge()"> purge accounts expired 30+ days ago</button> <span id="purgeOut" class="mut"></span></div><div id="users" class="mut">—</div></section>
       <section><h2>🧾 recent payments</h2><div id="pays" class="mut">—</div></section>
       <section><h2>📲 VIP invites issued (window)</h2><div id="inv" class="mut">—</div></section>
+      <section><h2>📡 signals ledger — auto, unedited</h2><div id="sig" class="mut">—</div></section>
     </div>
   </div>
   <p class="mut" style="text-align:center;margin-top:18px">cockpit auto-refreshes every 45s · data comes from the server, never stored here</p>
@@ -119,6 +120,10 @@ function go(){ if(!K())return
    j.recent_payments.map(p=>'<tr><td class="mut">'+esc(String(p.created_at||'').slice(5,16).replace('T',' '))+'</td><td>'+esc(p.provider)+'</td><td>'+esc(p.item)+'</td><td>R'+esc(p.amount)+'</td><td>'+(p.status==='paid'?'<span class="okt">paid</span>':p.status==='pending'?'<span style="color:var(--gold)">pending</span>':'<span class="err">'+esc(p.status)+'</span>')+'</td></tr>').join('')+'</table>':'<span class="mut">no payments yet</span>'
   $('bot').innerHTML='analyses: <b>'+(j.bot?.boosts??0)+'</b> · success <b>'+(j.bot?.success_pct??100)+'%</b> · median <b>'+(j.bot?.p50_ms??0)+'ms</b> · p95 <b>'+(j.bot?.p95_ms??0)+'ms</b>'
   $('errs').innerHTML=(j.errors||[]).length?'<table><tr><th>when</th><th>what</th><th>detail</th></tr>'+j.errors.map(e=>'<tr><td class="mut">'+esc(String(e.at||'').slice(5,16).replace('T',' '))+'</td><td>'+esc(e.kind)+'</td><td class="err">'+esc(e.detail||'')+'</td></tr>').join('')+'</table>':'<span class="okt">all clean ✅</span>'
+  const sg=j.signals||{}
+  $('sig').innerHTML='<div style="margin-bottom:8px"><b>'+(sg.wins||0)+'</b>W / <b>'+(sg.losses||0)+'</b>L resolved · <b>'+((sg.open||[]).length)+'</b> open</div>'+
+   ((sg.recent||[]).length?'<table><tr><th>#</th><th>when</th><th>plan</th><th>grade</th><th>status</th><th>R</th></tr>'+
+   sg.recent.map(x=>'<tr><td>'+x.id+'</td><td class="mut">'+esc(String(x.ts||'').slice(5,16).replace('T',' '))+'</td><td>'+esc(x.symbol)+' '+esc(x.side)+'</td><td>'+pill(x.grade)+'</td><td>'+esc(x.status)+'</td><td class="mut">'+(x.r_realized!=null?esc(x.r_realized):'—')+'</td></tr>').join('')+'</table>':'<span class="mut">no signals yet</span>')
   $('inv').innerHTML=(j.invites||[]).length?j.invites.map(i=>'<div class="mut">'+esc(String(i.tg_invite_at||'').slice(5,16).replace('T',' '))+' · '+esc(i.handle||'')+'</div>').join(''):'<span class="mut">none in window</span>'
  }) }
 </script></body></html>
