@@ -72,6 +72,7 @@
       <section><h2>🧾 recent payments</h2><div id="pays" class="mut">—</div></section>
       <section><h2>📲 VIP invites issued (window)</h2><div id="inv" class="mut">—</div></section>
       <section><h2>📡 signals ledger — auto, unedited</h2><div id="sig" class="mut">—</div></section>
+      <section><h2>📱 telegram machine</h2><div id="tgx" class="mut">—</div></section>
     </div>
   </div>
   <p class="mut" style="text-align:center;margin-top:18px">cockpit auto-refreshes every 45s · data comes from the server, never stored here</p>
@@ -120,6 +121,10 @@ function go(){ if(!K())return
    j.recent_payments.map(p=>'<tr><td class="mut">'+esc(String(p.created_at||'').slice(5,16).replace('T',' '))+'</td><td>'+esc(p.provider)+'</td><td>'+esc(p.item)+'</td><td>R'+esc(p.amount)+'</td><td>'+(p.status==='paid'?'<span class="okt">paid</span>':p.status==='pending'?'<span style="color:var(--gold)">pending</span>':'<span class="err">'+esc(p.status)+'</span>')+'</td></tr>').join('')+'</table>':'<span class="mut">no payments yet</span>'
   $('bot').innerHTML='analyses: <b>'+(j.bot?.boosts??0)+'</b> · success <b>'+(j.bot?.success_pct??100)+'%</b> · median <b>'+(j.bot?.p50_ms??0)+'ms</b> · p95 <b>'+(j.bot?.p95_ms??0)+'ms</b>'
   $('errs').innerHTML=(j.errors||[]).length?'<table><tr><th>when</th><th>what</th><th>detail</th></tr>'+j.errors.map(e=>'<tr><td class="mut">'+esc(String(e.at||'').slice(5,16).replace('T',' '))+'</td><td>'+esc(e.kind)+'</td><td class="err">'+esc(e.detail||'')+'</td></tr>').join('')+'</table>':'<span class="okt">all clean ✅</span>'
+  const tg=j.tg||{}
+  $('tgx').innerHTML='<div style="margin-bottom:8px">VIP group <code>'+esc(String(tg.vip_chat||'—'))+'</code> · free group <code>'+esc(String(tg.free_chat||'NOT SET'))+'</code></div>'+
+   '<div style="margin-bottom:8px"><b>'+(tg.linked||0)+'</b> accounts linked · <b>'+(tg.kicked||0)+'</b> kicked for lapse · <b>'+(tg.signals_posted||0)+'</b> VIP posts · <b>'+(tg.mirrors||0)+'</b> free mirrors</div>'+
+   ((tg.acts||[]).length?'<table><tr><th>when</th><th>event</th><th>ok</th></tr>'+tg.acts.map(a=>'<tr><td class="mut">'+esc(String(a.at||'').slice(5,16).replace('T',' '))+'</td><td>'+esc(a.detail||'')+'</td><td>'+(a.ok?'<span class="okt">✓</span>':'<span class="err">✗</span>')+'</td></tr>').join('')+'</table>':'<span class="mut">no telegram events yet</span>')
   const sg=j.signals||{}
   $('sig').innerHTML='<div style="margin-bottom:8px"><b>'+(sg.wins||0)+'</b>W / <b>'+(sg.losses||0)+'</b>L resolved · <b>'+((sg.open||[]).length)+'</b> open</div>'+
    ((sg.recent||[]).length?'<table><tr><th>#</th><th>when</th><th>plan</th><th>grade</th><th>status</th><th>R</th></tr>'+
